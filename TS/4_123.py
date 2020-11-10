@@ -1,16 +1,18 @@
 ## Assignment 4.1
 
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 print("[Exercise 4.1]")
 
 # Declare file names
-file_activity_labels = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/activity_labels.txt"
-file_features = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/features.txt"
-file_testX = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/test/X_test.txt"
-file_testY = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/test/y_test.txt"
-file_trainX = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/train/X_train.txt"
-file_trainY = "/home/selina/Desktop/DS/datascience/TS/UCI_HAR_Dataset/train/y_train.txt"
+file_activity_labels = "UCI HAR Dataset/activity_labels.txt"
+file_features = "UCI HAR Dataset/features.txt"
+file_testX = "UCI HAR Dataset/test/X_test.txt"
+file_testY = "UCI HAR Dataset/test/y_test.txt"
+file_trainX = "UCI HAR Dataset/train/X_train.txt"
+file_trainY = "UCI HAR Dataset/train/y_train.txt"
 
 # Import data
 activity_labels = pd.read_csv(file_activity_labels, delimiter=" ", header=None, names=['id', 'activity'])
@@ -28,6 +30,7 @@ test_Y['label'] = test_Y[0].transform(lambda c: activity_labels['activity'][c - 
 train_X['label'] = train_Y['label']
 test_X['label'] = test_Y['label']
 
+# Combine training and test data
 X = pd.concat([train_X, test_X], ignore_index=True)
 Y = pd.concat([train_Y, test_Y], ignore_index=True)
 
@@ -39,11 +42,33 @@ print()
 
 ### 4.1b: statistics
 print("[4.1b: statistics]")
-nFeatures = 5 # amount of features
-
+nFeatures = 6 # amount of features
+# Calculate statistics for some features (columns)
 for i in range(0, nFeatures):
     print(" Feature :", features['feature'][i])
-    print("    Mean : %0.3f" % X.head(nFeatures)[i].mean())
-    print("  Median : %0.3f" % X.head(nFeatures)[i].median())
-    print("  Stddev : %0.3f" % X.head(nFeatures)[i].std())
+    print("    Mean : %0.3f" % X[i].mean())
+    print("  Median : %0.3f" % X[i].median())
+    print("  Stddev : %0.3f" % X[i].std())
     print()
+
+### Exercise 4.2
+print("[Exercise 4.2]")
+
+### 4.2a: dimensions
+print("[4.2a: dimensionality]")
+print("Training set :", train_Y.shape)  # (7352, 561)
+print("    Test set :", test_Y.shape)  # (2947, 561)
+print()
+
+### 4.2b: bar chart
+print("[4.2a: bar chart]")
+activity_counts = Y[0].value_counts(normalize=False).sort_index() # count occurrence
+
+# make plot
+plt.figure(figsize=(15, 6))
+plt.xlabel("Activity")
+plt.ylabel("Counts")
+plt.bar(activity_labels['activity'], activity_counts)
+plt.savefig("figures/4_2b.png", dpi=300)
+
+
