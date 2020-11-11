@@ -77,8 +77,11 @@ print()
 print("[Exercise 4.3]")
 grouped_X = train_X.groupby('label')
 random.seed(9001) # set random number seed
+plt.figure(figsize=(6,4))
+
 for i in range(0,10):
     feature_id = random.randint(0,features.shape[0])
+
     plt.clf()
     grouped_X[feature_id].plot.kde()
     plt.title(features['feature'].values[feature_id])
