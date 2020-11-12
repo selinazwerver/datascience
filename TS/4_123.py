@@ -56,8 +56,8 @@ print("[Exercise 4.2]")
 
 ### 4.2a: dimensions
 print("[4.2a: dimensionality]")
-print("Training set :", train_Y.shape)  # (7352, 1)
-print("    Test set :", test_Y.shape)  # (2947, 1)
+print("Training set :", train_Y.shape)
+print("    Test set :", test_Y.shape)
 print()
 
 ### 4.2b: bar chart
