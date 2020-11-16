@@ -38,8 +38,8 @@ total_acc_z = pd.concat([train_total_acc_z, test_total_acc_z])
 
 ### 4.4a: dimensionality
 print("[Exercise 4.4]")
-print("Training set :", train_total_acc_x.shape) # (7352, 128)
-print("    Test set :", test_total_acc_x.shape) # (2947, 128)
+print("Training set :", train_total_acc_x.shape)  # (7352, 128)
+print("    Test set :", test_total_acc_x.shape)  # (2947, 128)
 print()
 
 ### 4.4b: reconstruct original signal
@@ -57,9 +57,9 @@ print()
 # print("  Variance z : %0.2f" % z_var)
 
 # Same thing as above but takes less time
-x_var = total_acc_x.apply(lambda row : row.var(), axis=1).sum()
-y_var = total_acc_y.apply(lambda row : row.var(), axis=1).sum()
-z_var = total_acc_z.apply(lambda row : row.var(), axis=1).sum()
+x_var = total_acc_x.apply(lambda row: row.var(), axis=1).sum()
+y_var = total_acc_y.apply(lambda row: row.var(), axis=1).sum()
+z_var = total_acc_z.apply(lambda row: row.var(), axis=1).sum()
 variances = [x_var, y_var, z_var]
 greatest_var = ['x', 'y', 'z'][variances.index(max(variances))]
 
@@ -68,12 +68,23 @@ print("Variance y : %0.2f" % y_var)
 print("Variance z : %0.2f" % z_var)
 print("Greatest variance : %s" % greatest_var)
 
-
 # Select the corresponding body acceleration file
 file_test_body_acc = "UCI HAR Dataset/test/Inertial Signals/body_acc_%s_test.txt" % greatest_var
 file_train_body_acc = "UCI HAR Dataset/train/Inertial Signals/body_acc_%s_train.txt" % greatest_var
-test_body_acc = pd.read_csv(file_test_body_acc, delimiter=" ", header=None, skipinitialspace=True)
-train_body_acc = pd.read_csv(file_train_body_acc, delimiter=" ", header=None, skipinitialspace=True)
-
 file_train_Y = "UCI HAR Dataset/train/y_train.txt"
+
+# test_body_acc = pd.read_csv(file_test_body_acc, delimiter=" ", header=None, skipinitialspace=True)
+train_body_acc = pd.read_csv(file_train_body_acc, delimiter=" ", header=None, skipinitialspace=True)
 train_Y = pd.read_csv(file_train_Y, delimiter=" ", header=None, skipinitialspace=True)
+
+data = train_body_acc # simplify names
+labels = train_Y
+
+data = data.loc[:, :63] # remove half of the columns to solve overlap
+raw_data = data.values # convert dataframe to numpy array
+raw_data = raw_data.flatten() # flatten 2D dataset to 1D array
+raw_labels = np.repeat(labels.values.flatten(), 64) # obtain label per datapoint
+
+# Couple the class labels with the raw data points
+raw_signal = np.vstack((raw_data, raw_labels)).T
+
