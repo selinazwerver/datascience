@@ -24,10 +24,3 @@ plt.plot(x,signal) # original signal
 plt.subplot(1,2,2)
 plt.plot(f,ym) # fft
 plt.show()
-
-### 4.6
-print("[Exercise 4.6]")
-### 4.6a: fft of all 6 activities
-
-
-

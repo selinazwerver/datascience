@@ -113,5 +113,18 @@ for feature in ["mean", "std", "kurtosis"]:
     plt.legend(grouped_features.groups.keys())
     plt.savefig("figures/4.5_%s.png" % feature, dpi=300)
 
-print("[4.4: plot saved]")
+print("[4.5: plot saved]")
 print()
+
+### 4.6
+print("[Exercise 4.6]")
+### 4.6a: fft of all 6 activities
+fs = 50 # sample frequency
+T = 1/fs # sample time
+
+# Create dictionary for the activities
+raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])
+raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c-1])
+activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict
+
+
