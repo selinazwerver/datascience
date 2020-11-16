@@ -61,7 +61,7 @@ print("    Test set :", test_Y.shape)
 print()
 
 ### 4.2b: bar chart
-print("[4.2a: bar chart]")
+print("[4.2b: bar chart]")
 activity_counts = Y[0].value_counts(normalize=False).sort_index()  # count occurrence
 
 # Make plot
@@ -70,7 +70,6 @@ plt.xlabel("Activity")
 plt.ylabel("Counts")
 plt.bar(activity_labels['activity'], activity_counts)
 plt.savefig("figures/4_2b.png", dpi=300)
-print("[4.2a: bar chart saved]")
 print()
 
 ### 4.3
@@ -81,8 +80,6 @@ plt.figure(figsize=(6,4))
 
 for i in range(0,10):
     feature_id = random.randint(0,features.shape[0])
-
-    plt.clf()
     grouped_X[feature_id].plot.kde()
     plt.title(features['feature'].values[feature_id])
     plt.legend(grouped_X.groups.keys())
