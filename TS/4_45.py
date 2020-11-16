@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis as kurt
+from scipy import fft
 
 print("[Loading data]")
 print()
