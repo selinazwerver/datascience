@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis as kurt
 from scipy.fftpack import fft
+from scipy.signal import butter
+from scipy.signal import lfilter
 
 print("[Loading data]")
 print()
@@ -106,7 +108,6 @@ print()
 ### 4.6
 print("[Exercise 4.6]")
 
-
 # Function to calculate the fft
 def calculate_fft(x, T):
     # x: list of signal points, T: sample time
@@ -136,11 +137,15 @@ for activity, signal in activities_and_signals.items():
     signal = signal - np.mean(signal)
     t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
     f, y = calculate_fft(signal, T) # fourier transform
+
+    # Plot
     plt.figure(figsize=(15, 6))
     plt.subplot(1, 2, 1)
+    plt.plot(t, signal)  # original signal
     plt.grid(True)
     plt.title("Original signal activity %s" % activity)
-    plt.plot(t, signal)  # original signal
+    plt.ylim(-1, 1)
+
     plt.subplot(1, 2, 2)
     plt.plot(f, y)  # fft
     plt.grid(True)
@@ -148,4 +153,115 @@ for activity, signal in activities_and_signals.items():
     plt.savefig("figures/4.6_%s.png" % activity, dpi=300)
 
 print("[4.6: plots saved]")
+print()
+
+### 4.7
+print("[Exercise 4.7]")
+
+nsamples = 3000  # amount of samples to transform
+fn = fs/2  # nyquist frequency
+upper_limit = 3/fn  # upper limit cutoff frequency
+lower_limit = 0.6/fn  # lower limit cutoff frequency
+filter_order = 4  # order of the filters
+
+## Low-pass filter
+b_lp, a_lp = butter(filter_order, upper_limit, btype='lowpass', output='ba')
+i = 1
+
+plt.figure(figsize=(15, 6))
+for activity, signal in activities_and_signals.items():
+    signal = signal[0:nsamples]
+    signal = signal - np.mean(signal)
+    signal = lfilter(b_lp, a_lp, signal)
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
+    f, y = calculate_fft(signal, T) # fourier transform
+
+    # Plot filtered signal
+    plt.subplot(6, 2, i)
+    plt.grid(True)
+    plt.plot(t, signal, label=activity)  # original signal
+    plt.ylim(-1, 1)
+    plt.legend(loc="upper right")
+    if i == 1: plt.title("Low-pass filtered")
+    i +=1
+
+    # Plot frequency spectrum
+    plt.subplot(6, 2, i)
+    plt.plot(f, y, label=activity)  # fft
+    plt.grid(True)
+    plt.xlim(0, 3)
+    plt.legend(loc="upper right")
+    if i == 2: plt.title("FFT")
+    i+=1
+plt.tight_layout()
+plt.savefig("figures/4.7_lowpass.png", dpi=300)
+plt.close()
+
+## High-pass filter
+b_hp, a_hp = butter(filter_order, lower_limit, btype='highpass', output='ba')
+i = 1
+
+plt.figure(figsize=(15, 6))
+for activity, signal in activities_and_signals.items():
+    signal = signal[0:nsamples]
+    signal = signal - np.mean(signal)
+    signal = lfilter(b_hp, a_hp, signal)
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
+    f, y = calculate_fft(signal, T) # fourier transform
+
+    # Plot filtered signal
+    plt.subplot(6, 2, i)
+    plt.grid(True)
+    plt.plot(t, signal, label=activity)  # original signal
+    plt.ylim(-1, 1)
+    plt.legend(loc="upper right")
+    if i == 1: plt.title("High-pass filtered")
+    i += 1
+
+    # Plot frequency spectrum
+    plt.subplot(6, 2, i)
+    plt.plot(f, y, label=activity)  # fft
+    plt.grid(True)
+    plt.xlim(0, 3)
+    plt.legend(loc="upper right")
+    if i == 2: plt.title("FFT")
+    i+=1
+plt.tight_layout()
+plt.savefig("figures/4.7_highpass.png", dpi=300)
+plt.close()
+
+## Band-pass filter
+b_bp, a_bp = butter(filter_order, [lower_limit, upper_limit], btype='bandpass', output='ba')
+i=1
+
+plt.figure(figsize=(15, 6))
+for activity, signal in activities_and_signals.items():
+    signal = signal[0:nsamples]
+    signal = signal - np.mean(signal)
+    signal = lfilter(b_bp, a_bp, signal)
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
+    f, y = calculate_fft(signal, T) # fourier transform
+
+    # Plot filtered signal
+    plt.subplot(6, 2, i)
+    plt.grid(True)
+    plt.plot(t, signal, label=activity)  # original signal
+    plt.ylim(-1, 1)
+    plt.legend(loc="upper right")
+    if i == 1: plt.title("Band-pass filtered")
+    i += 1
+
+    # Plot frequency spectrum
+    plt.subplot(6, 2, i)
+    plt.plot(f, y, label=activity)  # fft
+    plt.grid(True)
+    plt.xlim(0, 3)
+    plt.legend(loc="upper right")
+    if i == 2: plt.title("FFT")
+    i += 1
+plt.tight_layout()
+plt.savefig("figures/4.7_bandpass.png", dpi=300)
+plt.close()
+
+print("[4.7: plots saved]")
 print()
