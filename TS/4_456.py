@@ -129,8 +129,8 @@ raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])
 raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c - 1])
 activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict()
 
-## TODO: add offset
 for activity, signal in activities_and_signals.items():
+    signal = signal - np.mean(signal)
     t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
     f, y = calculate_fft(signal, T) # fourier transform
     plt.figure(figsize=(15, 6))
