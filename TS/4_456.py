@@ -123,13 +123,16 @@ def calculate_fft(x, T):
 ### 4.6a: fft of all 6 activities
 fs = 50  # sample frequency
 T = 1 / fs  # sample time
+nsamples = 1000  # amount of samples to transform
 
 # Create dictionary for the activities
 raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])
 raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c - 1])
 activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict()
 
+## TODO: change length of signal we want to transform?
 for activity, signal in activities_and_signals.items():
+    signal = signal[0:nsamples]
     signal = signal - np.mean(signal)
     t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
     f, y = calculate_fft(signal, T) # fourier transform
