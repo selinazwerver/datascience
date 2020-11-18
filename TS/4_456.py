@@ -1,10 +1,8 @@
-## Assignment 4.4
-
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import kurtosis as kurt
-from scipy import fft
+from scipy.fftpack import fft
 
 print("[Loading data]")
 print()
@@ -47,24 +45,13 @@ print()
 
 ### 4.4b: reconstruct original signal
 print("[4.4b: variances]")
-# Calculate the variances of the accelerations of all 3 axes
-# x_var, y_var, z_var = 0, 0, 0
-# for i in range(0,total_acc_x.shape[0]):
-#     x_var += total_acc_x.iloc[i].var()
-#     y_var += total_acc_y.iloc[i].var()
-#     z_var += total_acc_z.iloc[i].var()
-#
-# print("  Variance x : %0.2f" % x_var)
-# print("  Variance y : %0.2f" % y_var)
-# print("  Variance z : %0.2f" % z_var)
 
-# Same thing as above but takes less time
+# Calculate the variances of the accelerations of all 3 axes
 x_var = total_acc_x.apply(lambda row: row.var(), axis=1).sum()
 y_var = total_acc_y.apply(lambda row: row.var(), axis=1).sum()
 z_var = total_acc_z.apply(lambda row: row.var(), axis=1).sum()
 variances = [x_var, y_var, z_var]
 greatest_var = ['x', 'y', 'z'][variances.index(max(variances))]
-
 
 print("Variance x : %0.2f" % x_var)
 print("Variance y : %0.2f" % y_var)
@@ -104,7 +91,7 @@ for i in range(0, raw_data.size - 64, 64):
 time_domain_features = pd.DataFrame(np.vstack((mean, std, kurtosis, labels)).T,
                                     columns=["mean", "std", "kurtosis", "label"])
 # Transform labels to strings 
-time_domain_features["label"] = time_domain_features["label"].transform(lambda c : activity_labels['activity'][c-1])
+time_domain_features["label"] = time_domain_features["label"].transform(lambda c: activity_labels['activity'][c - 1])
 grouped_features = time_domain_features.groupby("label")
 for feature in ["mean", "std", "kurtosis"]:
     plt.figure()
@@ -118,13 +105,44 @@ print()
 
 ### 4.6
 print("[Exercise 4.6]")
+
+
+# Function to calculate the fft
+def calculate_fft(x, T):
+    # x: list of signal points, T: sample time
+    s = np.ceil(np.size(x) / 2)
+    y = (2 / np.size(x)) * fft(x)  # normalise to get proper amplitude
+    y = y[0:int(s)]  # take half so the negative part is not used
+    ym = abs(y)  # magnitude
+    f = np.arange(0, s)
+    fspacing = 1 / (np.size(x) * T)
+    f = fspacing * f  # frequency axis
+    return f, ym
+
+
 ### 4.6a: fft of all 6 activities
-fs = 50 # sample frequency
-T = 1/fs # sample time
+fs = 50  # sample frequency
+T = 1 / fs  # sample time
 
 # Create dictionary for the activities
 raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])
-raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c-1])
-activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict
+raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c - 1])
+activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict()
 
+## TODO: add offset
+for activity, signal in activities_and_signals.items():
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
+    f, y = calculate_fft(signal, T) # fourier transform
+    plt.figure(figsize=(15, 6))
+    plt.subplot(1, 2, 1)
+    plt.grid(True)
+    plt.title("Original signal activity %s" % activity)
+    plt.plot(t, signal)  # original signal
+    plt.subplot(1, 2, 2)
+    plt.plot(f, y)  # fft
+    plt.grid(True)
+    plt.title("FFT activity %s" % activity)
+    plt.savefig("figures/4.6_%s.png" % activity, dpi=300)
 
+print("[4.6: plots saved]")
+print()
