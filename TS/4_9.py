@@ -4,7 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.stats import mode
 from scipy.spatial.distance import squareform
-from sklearn.metrics import classification_report, confusion_matrix
+from statsmodels.tsa.stattools import adfuller
 
 try:
     from IPython.display import clear_output
@@ -12,6 +12,7 @@ try:
     have_ipython = True
 except ImportError:
     have_ipython = False
+
 
 class KnnDtw(object):
     """K-nearest neighbor classifier using dynamic time warping
@@ -237,6 +238,7 @@ class ProgressBar:
         return str(self.prog_bar)
 
 
+### Exercise 4.9a
 print("[Exercise 4.9]")
 file_countries = "Earth Surface Temperature Study/GlobalLandTemperaturesByCountry.csv"
 data_countries = pd.read_csv(file_countries)
@@ -254,6 +256,7 @@ for country, group in countries_grouped:
 
 dates.sort(reverse=True)  # sort newest date first
 start_date = dates[0]  # minimum date from where to plot
+print("[4.9a] No more NaN after", start_date)
 npoints = 252  # amount of data points to plot
 
 temperature_per_country = {}
@@ -270,8 +273,8 @@ for country, group in data_countries.groupby("Country"):
     # Plot
     plt.plot(timeline, temperatures, label=country)
 
-    # Store data in dict
-    temperature_per_country[country] = temperatures
+    # Store (all) data in dict
+    temperature_per_country[country] = group["AverageTemperature"].to_numpy()[plot_range[0]:-2]
 
 plt.xticks(rotation=90)
 xticks = plt.gca().xaxis.get_major_ticks()
@@ -280,24 +283,65 @@ for i in range(len(xticks)):
     if i % 12 != 0:
         xticks[i].set_visible(False)
 plt.tight_layout()
+plt.xlabel("Temperature [deg]")
 plt.legend()
 plt.title("Yearly temperatures for %i years" % (npoints / 12 - 1))
 plt.grid()
-plt.savefig("4.9a_temperatures.png", dpi=300)
+plt.savefig("figures/4.9a_temperatures.png", dpi=300)
 
 print("[4.9a] Plot saved")
 print()
 
-dtw = KnnDtw()
-print("[4.9b] Table with minimal DTW distance")
-HeaderRow = "DISTANCE ".ljust(10)
-for i1, c1 in enumerate(countries):
-    HeaderRow += c1.ljust(10)
-print(HeaderRow)
+# dtw = KnnDtw()
+# print("[4.9a] Table with minimal DTW distance")
+# HeaderRow = " DISTANCE ".ljust(10)
+# for i1, c1 in enumerate(countries):
+#     HeaderRow += c1.ljust(10)
+# print(HeaderRow)
+#
+# for i1, c1 in enumerate(countries):
+#     Row = (c1 + " ").rjust(10)
+#     for i2, c2 in enumerate(countries):
+#         distance, cost = dtw._dtw_distance(temperature_per_country[c1], temperature_per_country[c2])
+#         Row += str(int(distance)).ljust(10)
+#     print(Row)
+# print()
 
-for i1, c1 in enumerate(countries):
-    Row = (c1 + " ").rjust(10)
-    for i2, c2 in enumerate(countries):
-        distance, cost = dtw._dtw_distance(temperature_per_country[c1], temperature_per_country[c2])
-        Row += str(int(distance)).ljust(10)
-    print(Row)
+
+#  DISTANCE Norway    Finland   Singapore Cambodia
+#    Norway 0         4046      47527     47779
+#   Finland 4046      0         45403     45655
+# Singapore 47527     45403     0         1283
+#  Cambodia 47779     45655     1283      0
+
+### Exercise 4.9b
+def test_stationarity(timeseries, country):
+    # Determining rolling statistics
+    rolmean = pd.DataFrame(timeseries).rolling(window=12).mean()
+    rolstd = pd.DataFrame(timeseries).rolling(window=12).std()
+
+    # Plot rolling statistics:
+    orig = plt.plot(timeseries, color='blue', label='Original')
+    mean = plt.plot(rolmean, color='red', label='Rolling Mean')
+    std = plt.plot(rolstd, color='black', label='Rolling Std')
+    plt.legend(loc='best')
+    plt.xlabel("Temperature [deg]")
+    plt.grid()
+    plt.title('Rolling Mean & Standard Deviation')
+    plt.savefig("figures/4.9b_%s.png" % country, dpi=300)
+
+    # Perform Dickey-Fuller test:
+    print(country)
+    dftest = adfuller(timeseries, autolag='AIC')
+    dfoutput = pd.Series(dftest[0:4], index=['Test Statistic', 'p-value', '#Lags Used', 'Number of Observations Used'])
+    for key, value in dftest[4].items():
+        dfoutput['Critical Value (%s)' % key] = value
+    print(dfoutput)
+
+print("[4.9b] Dickey-Fuller test results")
+
+plt.figure()
+for country in temperature_per_country:
+    plt.clf()
+    test_stationarity(temperature_per_country[country], country)
+    print()
