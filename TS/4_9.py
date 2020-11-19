@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import mode
 from scipy.spatial.distance import squareform
 from statsmodels.tsa.stattools import adfuller
+from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.stattools import acf, pacf
 
 try:
     from IPython.display import clear_output
@@ -260,6 +262,7 @@ print("[4.9a] No more NaN after", start_date)
 npoints = 252  # amount of data points to plot
 
 temperature_per_country = {}
+timeline_per_country = {}
 plt.figure(figsize=(12, 6))
 for country, group in data_countries.groupby("Country"):
     start_index = pd.Series(group["dt"] == start_date)  # find start index
@@ -275,6 +278,7 @@ for country, group in data_countries.groupby("Country"):
 
     # Store (all) data in dict
     temperature_per_country[country] = group["AverageTemperature"].to_numpy()[plot_range[0]:-2]
+    timeline_per_country[country] = group["dt"].to_numpy()[plot_range[0]:-2]
 
 plt.xticks(rotation=90)
 xticks = plt.gca().xaxis.get_major_ticks()
@@ -315,20 +319,26 @@ print()
 #  Cambodia 47779     45655     1283      0
 
 ### Exercise 4.9b
-def test_stationarity(timeseries, country):
+def test_stationarity(timeseries, country, timeline, ex):
     # Determining rolling statistics
     rolmean = pd.DataFrame(timeseries).rolling(window=12).mean()
     rolstd = pd.DataFrame(timeseries).rolling(window=12).std()
 
     # Plot rolling statistics:
-    orig = plt.plot(timeseries, color='blue', label='Original')
+    orig = plt.plot(timeline, timeseries, color='blue', label='Original')
     mean = plt.plot(rolmean, color='red', label='Rolling Mean')
     std = plt.plot(rolstd, color='black', label='Rolling Std')
     plt.legend(loc='best')
-    plt.xlabel("Temperature [deg]")
+    plt.ylabel("Temperature [deg]")
     plt.grid()
-    plt.title('Rolling Mean & Standard Deviation')
-    plt.savefig("figures/4.9b_%s.png" % country, dpi=300)
+    plt.xticks(rotation=90)
+    xticks = plt.gca().xaxis.get_major_ticks()
+    # Plot only every 12 labels
+    for i in range(len(xticks)):
+        if i % 120 != 0:
+            xticks[i].set_visible(False)
+    plt.title('Rolling Mean & Standard Deviation %s' % country)
+    plt.savefig("figures/4.9%s_%s.png" % (ex, country), dpi=300)
 
     # Perform Dickey-Fuller test:
     print(country)
@@ -339,9 +349,68 @@ def test_stationarity(timeseries, country):
     print(dfoutput)
 
 print("[4.9b] Dickey-Fuller test results")
+plt.figure(figsize=(8,10))
+# for country in temperature_per_country:
+#     plt.clf()
+#     test_stationarity(temperature_per_country[country], country, timeline_per_country[country], 'b')
+#     print()
 
-plt.figure()
+### 4.9c
+temperature_decompose = {}
 for country in temperature_per_country:
-    plt.clf()
-    test_stationarity(temperature_per_country[country], country)
-    print()
+    decomposition = seasonal_decompose(temperature_per_country[country], period=12)
+    trend = decomposition.trend
+    seasonal = decomposition.seasonal
+    residual = decomposition.resid
+    decomposed = residual
+    temperature_decompose[country] = decomposed[~np.isnan(decomposed)]
+
+# dtw = KnnDtw()
+# print("[4.9c] Table with minimal DTW distance")
+# HeaderRow = " DISTANCE ".ljust(10)
+# for i1, c1 in enumerate(countries):
+#     HeaderRow += c1.ljust(10)
+# print(HeaderRow)
+
+# for i1, c1 in enumerate(countries):
+#     Row = (c1 + " ").rjust(10)
+#     for i2, c2 in enumerate(countries):
+#         distance, cost = dtw._dtw_distance(temperature_decompose[c1], temperature_decompose[c2])
+#         Row += str(int(distance)).ljust(10)
+#     print(Row)
+# print()
+
+#  DISTANCE Norway    Finland   Singapore Cambodia
+#    Norway 0         1437      1650      1454
+#   Finland 1437      0         2565      2335
+# Singapore 1650      2565      0         421
+#  Cambodia 1454      2335      421       0
+
+### 4.9d
+country = countries[0]
+print("[4.9d] Forecasting for:", country)
+lag_acf = acf(temperature_decompose[country], nlags=20)
+lag_pacf = pacf(temperature_decompose[country], nlags=20, method='ols')
+
+#Plot ACF:
+plt.figure(figsize=(15,6))
+plt.subplot(121)
+plt.plot(lag_acf)
+plt.axhline(y=0,linestyle='--',color='gray')
+plt.axhline(y=-1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.axhline(y=1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.grid()
+plt.title('Autocorrelation Function')
+
+#Plot PACF:
+plt.subplot(122)
+plt.plot(lag_pacf)
+plt.axhline(y=0,linestyle='--',color='gray')
+plt.axhline(y=-1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.axhline(y=1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.grid()
+plt.title('Partial Autocorrelation Function')
+plt.tight_layout()
+plt.savefig("figures/4.9d_(p)acf.png", dpi=300)
+
+
