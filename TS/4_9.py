@@ -18,35 +18,30 @@ for country, group in countries_grouped:
     dates.append(group["dt"].values[-2]) # last date where nan occurs per country
 
 dates.sort(reverse=True) # sort newest date first
-start_date = dates[0] # date from where to plot
-npoints = 180
-# print("Plotting from:", start_date)
+start_date = dates[0] # minimum date from where to plot
+npoints = 252 # amount of data points to plot
 
-plt.figure()
+plt.figure(figsize=(12,6))
 for country, group in data_countries.groupby("Country"):
     start_index = pd.Series(group["dt"] == start_date) # find start index
     start_index = start_index[start_index].index.values
-    # plot_range = [int(start_index) - group.first_valid_index(), group.shape[0]]
     plot_range = [int(start_index) - group.first_valid_index(), int(start_index) - group.first_valid_index() + npoints]
 
     temperatures = group["AverageTemperature"].to_numpy()[plot_range[0]:plot_range[1]]
     timeline = group["dt"].to_numpy()[plot_range[0]:plot_range[1]]
-    # date_time = pd.to_datetime(group["dt"])
-    print(timeline)
 
-    # plt.plot(np.arange(start=plot_range[0], stop=plot_range[1]), temperatures[plot_range[0]:plot_range[1]])
-    plot_set = pd.DataFrame()
-    plot_set["temp"] = temperatures
-    plot_set["date"] = timeline
+    # Plot
+    plt.plot(timeline, temperatures, label=country)
 
-    plt.xticks(rotation=90)
-    plt.plot( plot_set["date"], plot_set["temp"])
-
-    # plt.plot(timeline[plot_range[0]:plot_range[1]], temperatures[plot_range[0]:plot_range[1]])
-    # plt.gca().axes.xaxis.set_visible(False)
-    plt.show()
-    exit()
-    # temperatures = temperatures[start_index:]
-
-
+plt.xticks(rotation=90)
+xticks = plt.gca().xaxis.get_major_ticks()
+# Plot only every 12 labels
+for i in range(len(xticks)):
+    if i % 12 != 0:
+        xticks[i].set_visible(False)
+plt.tight_layout()
+plt.legend()
+plt.title("Yearly temperatures for %i years" % (npoints/12-1))
+plt.grid()
+plt.savefig("4.9a_temperatures.png", dpi=300)
 
