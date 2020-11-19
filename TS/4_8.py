@@ -316,7 +316,7 @@ _ = plt.yticks(range(6), [l for l in labels.values()])
 plt.show()
 plt.savefig("figures/4.8_rawx.png", dpi=300)
 
-print("[4.8  Finished]")
+print("[4.8] Finished")
 
 #  [****************100%******************]  217120 of 217120 complete
 #                          precision recall    f1-score    support

@@ -6,9 +6,6 @@ from scipy.fftpack import fft
 from scipy.signal import butter
 from scipy.signal import lfilter
 
-print("[Loading data]")
-print()
-
 # Declare file names
 file_activity_labels = "UCI HAR Dataset/activity_labels.txt"
 file_features = "UCI HAR Dataset/features.txt"
@@ -40,13 +37,13 @@ total_acc_z = pd.concat([train_total_acc_z, test_total_acc_z])
 
 ### 4.4a: dimensionality
 print("[Exercise 4.4]")
-print("[4.4a: dimensionality]")
+print("[4.4a] Dimensionality")
 print("Training set :", train_total_acc_x.shape)  # (7352, 128)
 print("    Test set :", test_total_acc_x.shape)  # (2947, 128)
 print()
 
 ### 4.4b: reconstruct original signal
-print("[4.4b: variances]")
+print("[4.4b] Variances")
 
 # Calculate the variances of the accelerations of all 3 axes
 x_var = total_acc_x.apply(lambda row: row.var(), axis=1).sum()
@@ -102,7 +99,7 @@ for feature in ["mean", "std", "kurtosis"]:
     plt.legend(grouped_features.groups.keys())
     plt.savefig("figures/4.5_%s.png" % feature, dpi=300)
 
-print("[4.5: plot saved]")
+print("[4.5] Plot saved")
 print()
 
 ### 4.6
@@ -152,7 +149,7 @@ for activity, signal in activities_and_signals.items():
     plt.title("FFT activity %s" % activity)
     plt.savefig("figures/4.6_%s.png" % activity, dpi=300)
 
-print("[4.6: plots saved]")
+print("[4.6] Plots saved")
 print()
 
 ### 4.7
@@ -263,5 +260,5 @@ plt.tight_layout()
 plt.savefig("figures/4.7_bandpass.png", dpi=300)
 plt.close()
 
-print("[4.7: plots saved]")
+print("[4.7] Plots saved")
 print()
