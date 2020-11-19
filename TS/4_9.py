@@ -7,6 +7,7 @@ from scipy.spatial.distance import squareform
 from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
+from statsmodels.tsa.arima_model import ARIMA
 
 try:
     from IPython.display import clear_output
@@ -296,6 +297,7 @@ plt.savefig("figures/4.9a_temperatures.png", dpi=300)
 print("[4.9a] Plot saved")
 print()
 
+
 # dtw = KnnDtw()
 # print("[4.9a] Table with minimal DTW distance")
 # HeaderRow = " DISTANCE ".ljust(10)
@@ -348,8 +350,9 @@ def test_stationarity(timeseries, country, timeline, ex):
         dfoutput['Critical Value (%s)' % key] = value
     print(dfoutput)
 
+
 print("[4.9b] Dickey-Fuller test results")
-plt.figure(figsize=(8,10))
+plt.figure(figsize=(8, 10))
 # for country in temperature_per_country:
 #     plt.clf()
 #     test_stationarity(temperature_per_country[country], country, timeline_per_country[country], 'b')
@@ -392,25 +395,60 @@ print("[4.9d] Forecasting for:", country)
 lag_acf = acf(temperature_decompose[country], nlags=20)
 lag_pacf = pacf(temperature_decompose[country], nlags=20, method='ols')
 
-#Plot ACF:
-plt.figure(figsize=(15,6))
+# Plot ACF:
+plt.figure(figsize=(15, 6))
 plt.subplot(121)
 plt.plot(lag_acf)
-plt.axhline(y=0,linestyle='--',color='gray')
-plt.axhline(y=-1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
-plt.axhline(y=1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.axhline(y=0, linestyle='--', color='gray')
+plt.axhline(y=-1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
+plt.axhline(y=1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
 plt.grid()
 plt.title('Autocorrelation Function')
 
-#Plot PACF:
+# Plot PACF:
 plt.subplot(122)
 plt.plot(lag_pacf)
-plt.axhline(y=0,linestyle='--',color='gray')
-plt.axhline(y=-1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
-plt.axhline(y=1.96/np.sqrt(len(temperature_decompose[country])),linestyle='--',color='gray')
+plt.axhline(y=0, linestyle='--', color='gray')
+plt.axhline(y=-1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
+plt.axhline(y=1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
 plt.grid()
 plt.title('Partial Autocorrelation Function')
 plt.tight_layout()
 plt.savefig("figures/4.9d_(p)acf.png", dpi=300)
 
+upper_confidence = 1.96 / np.sqrt(len(temperature_decompose[country]))
+p = np.argmax(lag_pacf < upper_confidence)
+q = np.argmax(lag_acf < upper_confidence)
+d = 1
 
+print("[4.9d] p = %i, q = %i" % (p, q))
+npoints = 100 # amount of data points to plot
+
+## AR model
+plt.figure()
+model = ARIMA(temperature_per_country[country], order=(p, d, 0))
+results_AR = model.fit(disp=-1)
+plt.plot(temperature_decompose[country][0:npoints])
+plt.plot(results_AR.fittedvalues[0:npoints], color='red')
+plt.grid()
+plt.title('RSS: %.4f'% sum((results_AR.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
+plt.savefig("figures/4.9d_ar.png", dpi=300)
+
+## MA model
+plt.clf()
+model = ARIMA(temperature_per_country[country], order=(0, d, q))
+results_MA = model.fit(disp=-1)
+plt.plot(temperature_decompose[country][0:npoints])
+plt.plot(results_MA.fittedvalues[0:npoints], color='red')
+plt.grid()
+plt.title('RSS: %.4f'% sum((results_MA.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
+plt.savefig("figures/4.9d_ma.png", dpi=300)
+
+## Combined model
+model = ARIMA(temperature_per_country[country], order=(p, d, q))
+results_ARIMA = model.fit(disp=-1)
+plt.plot(temperature_decompose[country][0:npoints])
+plt.grid()
+plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
+plt.title('RSS: %.4f'% sum((results_ARIMA.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
+plt.savefig("figures/4.9d_arma.png", dpi=300)
