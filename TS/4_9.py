@@ -10,6 +10,7 @@ from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
 
 import warnings
+
 warnings.filterwarnings("ignore")
 
 try:
@@ -395,9 +396,12 @@ for country in temperature_per_country:
 ### 4.9d
 country = countries[0]
 print("[4.9d] Forecasting for:", country)
-# Differencing
-temperature_diff = np.diff(temperature_per_country[country])
-temperature_diff = temperature_diff[~np.isnan(temperature_diff)]
+# Remove five years for testing at the end
+temperature_data_train = temperature_per_country[country][:-12 * 5]
+temperature_data_test = temperature_per_country[country][-12 * 5:]
+timeline_test = timeline_per_country[country][-12 * 5:]
+temperature_diff = np.diff(temperature_per_country[country])  # differencing
+temperature_diff = temperature_diff[~np.isnan(temperature_diff)]  # remove nan
 
 lag_acf = acf(temperature_diff, nlags=20)
 lag_pacf = pacf(temperature_diff, nlags=20, method='ols')
@@ -429,7 +433,7 @@ q = np.argmax(lag_acf < upper_confidence)
 d = 0
 
 print("[4.9d] p = %i, q = %i" % (p, q))
-npoints = 120 # amount of data points to plot
+npoints = 120  # amount of data points to plot
 
 ## AR model
 plt.figure()
@@ -438,7 +442,7 @@ results_AR = model.fit(disp=-1)
 plt.plot(temperature_diff[0:npoints])
 plt.plot(results_AR.fittedvalues[0:npoints], color='red')
 plt.grid()
-plt.title('RSS: %.4f'% sum((results_AR.fittedvalues[0:npoints]-temperature_diff[0:npoints])**2))
+plt.title('RSS: %.4f' % sum((results_AR.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
 plt.savefig("figures/4.9d_ar.png", dpi=300)
 
 ## MA model
@@ -448,18 +452,33 @@ results_MA = model.fit(disp=-1)
 plt.plot(temperature_diff[0:npoints])
 plt.plot(results_MA.fittedvalues[0:npoints], color='red')
 plt.grid()
-plt.title('RSS: %.4f'% sum((results_MA.fittedvalues[0:npoints]-temperature_diff[0:npoints])**2))
+plt.title('RSS: %.4f' % sum((results_MA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
 plt.savefig("figures/4.9d_ma.png", dpi=300)
 
 ## Combined model
 plt.clf()
-try:
-    model = ARIMA(temperature_per_country[country], order=(p, d, q))
-    results_ARIMA = model.fit(disp=-1)
-    plt.plot(temperature_diff[0:npoints])
-    plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
-    plt.grid()
-    plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
-    plt.savefig("figures/4.9d_arma.png", dpi=300)
-except:
-    print("Could not create ARIMA model")
+model = ARIMA(temperature_per_country[country], order=(p, d, q))
+results_ARIMA = model.fit(disp=-1)
+plt.plot(temperature_diff[0:npoints])
+plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
+plt.grid()
+plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
+plt.savefig("figures/4.9d_arma.png", dpi=300)
+
+### 4.9e
+predictions = results_ARIMA.predict(start=len(temperature_data_train),
+                                                   end=len(temperature_data_train) + len(temperature_data_test) - 1,
+                                                   typ='levels')
+plt.clf()
+plt.plot(timeline_test, temperature_data_test, label='original')
+plt.plot(predictions, label='prediction')
+plt.grid()
+plt.legend()
+plt.ylabel("Temperature [deg]")
+xticks = plt.gca().xaxis.get_major_ticks()
+# Plot only every 12 labels
+for i in range(len(xticks)):
+    if i % 12 != 0:
+        xticks[i].set_visible(False)
+plt.title('5 year prediction for %s' % country)
+plt.savefig("figures/4.9e.png", dpi=300)
