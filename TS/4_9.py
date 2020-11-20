@@ -9,6 +9,9 @@ from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
 
+import warnings
+warnings.filterwarnings("ignore")
+
 try:
     from IPython.display import clear_output
 
@@ -392,16 +395,20 @@ for country in temperature_per_country:
 ### 4.9d
 country = countries[0]
 print("[4.9d] Forecasting for:", country)
-lag_acf = acf(temperature_decompose[country], nlags=20)
-lag_pacf = pacf(temperature_decompose[country], nlags=20, method='ols')
+# Differencing
+temperature_diff = np.diff(temperature_per_country[country])
+temperature_diff = temperature_diff[~np.isnan(temperature_diff)]
+
+lag_acf = acf(temperature_diff, nlags=20)
+lag_pacf = pacf(temperature_diff, nlags=20, method='ols')
 
 # Plot ACF:
 plt.figure(figsize=(15, 6))
 plt.subplot(121)
 plt.plot(lag_acf)
 plt.axhline(y=0, linestyle='--', color='gray')
-plt.axhline(y=-1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
-plt.axhline(y=1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
+plt.axhline(y=-1.96 / np.sqrt(len(temperature_diff)), linestyle='--', color='gray')
+plt.axhline(y=1.96 / np.sqrt(len(temperature_diff)), linestyle='--', color='gray')
 plt.grid()
 plt.title('Autocorrelation Function')
 
@@ -409,8 +416,8 @@ plt.title('Autocorrelation Function')
 plt.subplot(122)
 plt.plot(lag_pacf)
 plt.axhline(y=0, linestyle='--', color='gray')
-plt.axhline(y=-1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
-plt.axhline(y=1.96 / np.sqrt(len(temperature_decompose[country])), linestyle='--', color='gray')
+plt.axhline(y=-1.96 / np.sqrt(len(temperature_diff)), linestyle='--', color='gray')
+plt.axhline(y=1.96 / np.sqrt(len(temperature_diff)), linestyle='--', color='gray')
 plt.grid()
 plt.title('Partial Autocorrelation Function')
 plt.tight_layout()
@@ -419,36 +426,40 @@ plt.savefig("figures/4.9d_(p)acf.png", dpi=300)
 upper_confidence = 1.96 / np.sqrt(len(temperature_decompose[country]))
 p = np.argmax(lag_pacf < upper_confidence)
 q = np.argmax(lag_acf < upper_confidence)
-d = 1
+d = 0
 
 print("[4.9d] p = %i, q = %i" % (p, q))
-npoints = 100 # amount of data points to plot
+npoints = 120 # amount of data points to plot
 
 ## AR model
 plt.figure()
 model = ARIMA(temperature_per_country[country], order=(p, d, 0))
 results_AR = model.fit(disp=-1)
-plt.plot(temperature_decompose[country][0:npoints])
+plt.plot(temperature_diff[0:npoints])
 plt.plot(results_AR.fittedvalues[0:npoints], color='red')
 plt.grid()
-plt.title('RSS: %.4f'% sum((results_AR.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
+plt.title('RSS: %.4f'% sum((results_AR.fittedvalues[0:npoints]-temperature_diff[0:npoints])**2))
 plt.savefig("figures/4.9d_ar.png", dpi=300)
 
 ## MA model
 plt.clf()
 model = ARIMA(temperature_per_country[country], order=(0, d, q))
 results_MA = model.fit(disp=-1)
-plt.plot(temperature_decompose[country][0:npoints])
+plt.plot(temperature_diff[0:npoints])
 plt.plot(results_MA.fittedvalues[0:npoints], color='red')
 plt.grid()
-plt.title('RSS: %.4f'% sum((results_MA.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
+plt.title('RSS: %.4f'% sum((results_MA.fittedvalues[0:npoints]-temperature_diff[0:npoints])**2))
 plt.savefig("figures/4.9d_ma.png", dpi=300)
 
 ## Combined model
-model = ARIMA(temperature_per_country[country], order=(p, d, q))
-results_ARIMA = model.fit(disp=-1)
-plt.plot(temperature_decompose[country][0:npoints])
-plt.grid()
-plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
-plt.title('RSS: %.4f'% sum((results_ARIMA.fittedvalues[0:npoints]-temperature_decompose[country][0:npoints])**2))
-plt.savefig("figures/4.9d_arma.png", dpi=300)
+plt.clf()
+try:
+    model = ARIMA(temperature_per_country[country], order=(p, d, q))
+    results_ARIMA = model.fit(disp=-1)
+    plt.plot(temperature_diff[0:npoints])
+    plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
+    plt.grid()
+    plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
+    plt.savefig("figures/4.9d_arma.png", dpi=300)
+except:
+    print("Could not create ARIMA model")
