@@ -38,7 +38,8 @@ customer <- data0 %>%
 # Make table 'sales'
 sales <- data0 %>%
   select(Order_Date_Day, Product_Name, Product_Category, 
-         Customer_Name, Customer_Country, Order_Price_Total)
+         Customer_Name, Customer_Country, Order_Price_Total) %>%
+  rename(orderdate=Order_Date_Day, sales=Order_Price_Total)
 sales <- sales %>%
   full_join(customer, by=c("Customer_Name"="name",
                           "Customer_Country"="country")) %>%

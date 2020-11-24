@@ -114,8 +114,8 @@ dbWriteTable(con, "ReturnStatus", value = ReturnStatus, overwrite = T, row.names
 # Output
 dbGetQuery(con,
            "SELECT table_name FROM information_schema.tables
-           WHERE table_schema='ass3'") 
+WHERE table_schema='ass3'") ## to get the tables from schema ass3
 str(dbReadTable(con, c("ass3", "customer")))
 str(dbReadTable(con, c("ass3", "product")))
-str(dbReadTable(con, c("ass3", "sales")))
 str(dbReadTable(con, c("ass3", "ReturnStatus")))
+str(dbReadTable(con, c("ass3", "sales")))
