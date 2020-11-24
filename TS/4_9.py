@@ -268,7 +268,7 @@ npoints = 252  # amount of data points to plot
 
 temperature_per_country = {}
 timeline_per_country = {}
-plt.figure(figsize=(12, 6))
+plt.figure(figsize=(12, 8))
 for country, group in data_countries.groupby("Country"):
     start_index = pd.Series(group["dt"] == start_date)  # find start index
     start_index = start_index[start_index].index.values
@@ -292,15 +292,15 @@ for i in range(len(xticks)):
     if i % 12 != 0:
         xticks[i].set_visible(False)
 plt.tight_layout()
-plt.xlabel("Temperature [deg]")
+plt.ylabel("Temperature [deg]")
 plt.legend()
 plt.title("Yearly temperatures for %i years" % (npoints / 12 - 1))
 plt.grid()
+plt.tight_layout()
 plt.savefig("figures/4.9a_temperatures.png", dpi=300)
 
 print("[4.9a] Plot saved")
 print()
-
 
 # dtw = KnnDtw()
 # print("[4.9a] Table with minimal DTW distance")
@@ -344,6 +344,7 @@ def test_stationarity(timeseries, country, timeline, ex):
         if i % 120 != 0:
             xticks[i].set_visible(False)
     plt.title('Rolling Mean & Standard Deviation %s' % country)
+    plt.tight_layout()
     plt.savefig("figures/4.9%s_%s.png" % (ex, country), dpi=300)
 
     # Perform Dickey-Fuller test:
@@ -356,7 +357,7 @@ def test_stationarity(timeseries, country, timeline, ex):
 
 
 print("[4.9b] Dickey-Fuller test results")
-plt.figure(figsize=(8, 10))
+plt.figure(figsize=(6, 4))
 # for country in temperature_per_country:
 #     plt.clf()
 #     test_stationarity(temperature_per_country[country], country, timeline_per_country[country], 'b')
@@ -371,6 +372,17 @@ for country in temperature_per_country:
     residual = decomposition.resid
     decomposed = residual
     temperature_decompose[country] = decomposed[~np.isnan(decomposed)]
+
+plt.clf()
+for country in temperature_decompose:
+    plt.plot(temperature_decompose[country][:120], label=country)
+plt.grid()
+plt.legend()
+plt.xlabel("Months")
+plt.ylabel("Temperature [deg]")
+plt.title("Decomposed temperatures")
+plt.tight_layout()
+plt.savefig("figures/4.9c.png", dpi=300)
 
 # dtw = KnnDtw()
 # print("[4.9c] Table with minimal DTW distance")
@@ -439,31 +451,42 @@ npoints = 120  # amount of data points to plot
 plt.figure()
 model = ARIMA(temperature_per_country[country], order=(p, d, 0))
 results_AR = model.fit(disp=-1)
-plt.plot(temperature_diff[0:npoints])
-plt.plot(results_AR.fittedvalues[0:npoints], color='red')
+plt.plot(temperature_diff[0:npoints], label='data')
+plt.plot(results_AR.fittedvalues[0:npoints], color='red', label='model')
 plt.grid()
-plt.title('RSS: %.4f' % sum((results_AR.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
+plt.xlabel("Months")
+plt.ylabel("Temperature [deg]")
+plt.legend()
+plt.title('RSS: %.4f' % sum((results_AR.fittedvalues[:-1] - temperature_diff) ** 2))
 plt.savefig("figures/4.9d_ar.png", dpi=300)
 
 ## MA model
 plt.clf()
 model = ARIMA(temperature_per_country[country], order=(0, d, q))
 results_MA = model.fit(disp=-1)
-plt.plot(temperature_diff[0:npoints])
-plt.plot(results_MA.fittedvalues[0:npoints], color='red')
+plt.plot(temperature_diff[0:npoints], label='data')
+plt.plot(results_MA.fittedvalues[0:npoints], color='red', label='model')
 plt.grid()
-plt.title('RSS: %.4f' % sum((results_MA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
+plt.xlabel("Months")
+plt.ylabel("Temperature [deg]")
+plt.legend()
+plt.title('RSS: %.4f' % sum((results_MA.fittedvalues[:-1] - temperature_diff) ** 2))
 plt.savefig("figures/4.9d_ma.png", dpi=300)
 
 ## Combined model
 plt.clf()
 model = ARIMA(temperature_per_country[country], order=(p, d, q))
 results_ARIMA = model.fit(disp=-1)
-plt.plot(temperature_diff[0:npoints])
-plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red')
+plt.plot(temperature_diff[0:npoints], label='data')
+plt.plot(results_ARIMA.fittedvalues[0:npoints], color='red', label='model')
 plt.grid()
-plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues[0:npoints] - temperature_diff[0:npoints]) ** 2))
+plt.xlabel("Months")
+plt.ylabel("Temperature [deg]")
+plt.legend()
+plt.title('RSS: %.4f' % sum((results_ARIMA.fittedvalues[:-1] - temperature_diff) ** 2))
 plt.savefig("figures/4.9d_arma.png", dpi=300)
+
+exit()
 
 ### 4.9e
 predictions = results_ARIMA.predict(start=len(temperature_data_train),
