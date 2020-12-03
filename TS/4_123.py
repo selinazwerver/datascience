@@ -75,13 +75,12 @@ print()
 ### 4.3
 print("[Exercise 4.3]")
 grouped_X = train_X.groupby('label')
-random.seed(9001) # set random number seed
-plt.figure(figsize=(6,4))
+random.seed(9001)  # set random number seed to always generate same numbers
+plt.figure(figsize=(6, 4))
 
-for i in range(0,10):
-    feature_id = random.randint(0,features.shape[0])
-    grouped_X[feature_id].plot.kde()
+for i in range(0, 10):
+    feature_id = random.randint(0, features.shape[0])  # choose random feature
+    grouped_X[feature_id].plot.kde()  # plot feature kde
     plt.title(features['feature'].values[feature_id])
     plt.legend(grouped_X.groups.keys())
-    plt.savefig("figures/4.3_%i.png" % feature_id, dpi = 300)
-
+    plt.savefig("figures/4.3_%i.png" % feature_id, dpi=300)

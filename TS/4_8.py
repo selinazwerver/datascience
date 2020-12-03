@@ -1,3 +1,5 @@
+## Assignment 4.8
+
 import sys
 import collections
 import itertools
@@ -138,7 +140,7 @@ class KnnDtw(object):
             dm = squareform(dm)
             return dm
 
-        # Compute full distance matrix of dtw distnces between x and y
+        # Compute full distance matrix of dtw distances between x and y
         else:
             x_s = np.shape(x)
             y_s = np.shape(y)
@@ -228,20 +230,10 @@ class ProgressBar:
 
 
 # Import the HAR dataset
-# x_train_file = open('UCI HAR Dataset/train/X_train.txt', 'r')
-# y_train_file = open('UCI HAR Dataset/train/y_train.txt', 'r')
-#
-# x_test_file = open('UCI HAR Dataset/test/X_test.txt', 'r')
-# y_test_file = open('UCI HAR Dataset/test/y_test.txt', 'r')
-
 total_acc_x_train_file = open('UCI HAR Dataset/train/Inertial Signals/total_acc_x_train.txt')
-# total_acc_y_train_file = open('UCI HAR Dataset/train/Inertial Signals/total_acc_y_train.txt')
-# total_acc_z_train_file = open('UCI HAR Dataset/train/Inertial Signals/total_acc_z_train.txt')
 y_train_file = open('UCI HAR Dataset/train/y_train.txt', 'r')
 
 total_acc_x_test_file = open('UCI HAR Dataset/test/Inertial Signals/total_acc_x_test.txt')
-# total_acc_y_test_file = open('UCI HAR Dataset/test/Inertial Signals/total_acc_y_test.txt')
-# total_acc_z_test_file = open('UCI HAR Dataset/test/Inertial Signals/total_acc_z_test.txt')
 y_test_file = open('UCI HAR Dataset/test/y_test.txt', 'r')
 
 # Create empty lists
@@ -258,31 +250,14 @@ labels = {1: 'WALKING', 2: 'WALKING UPSTAIRS', 3: 'WALKING DOWNSTAIRS',
 for x in total_acc_x_train_file:
     x_train.append([float(ts) for ts in x.split()])
 
-# for x in total_acc_y_train_file:
-#     x_train.append([float(ts) for ts in x.split()])
-
-# for x in total_acc_z_train_file:
-#     x_train.append([float(ts) for ts in x.split()])
-
 for y in y_train_file:
     y_train.append(int(y.rstrip('\n')))
 
 for x in total_acc_x_test_file:
     x_test.append([float(ts) for ts in x.split()])
 
-# for x in total_acc_y_test_file:
-#     x_test.append([float(ts) for ts in x.split()])
-
-# for x in total_acc_z_test_file:
-#     x_test.append([float(ts) for ts in x.split()])
-
 for y in y_test_file:
     y_test.append(int(y.rstrip('\n')))
-
-# print(np.shape(x_train_before))
-# print(np.shape(x_train))
-#
-# exit()
 
 # Convert to numpy for efficiency
 x_train = np.array(x_train)

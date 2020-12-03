@@ -1,3 +1,5 @@
+## Assignment 4.4, 4.5, 4.6 and 4.7
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -85,7 +87,7 @@ for i in range(0, raw_data.size - 64, 64):
     kurtosis.append(kurt(window))
     labels.append(raw_labels[i])
 
-### 4.5a: feature plots
+### 4.5b: feature plots
 # Transform to dataframe for plotting
 time_domain_features = pd.DataFrame(np.vstack((mean, std, kurtosis, labels)).T,
                                     columns=["mean", "std", "kurtosis", "label"])
@@ -104,6 +106,7 @@ print()
 
 ### 4.6
 print("[Exercise 4.6]")
+
 
 # Function to calculate the fft
 def calculate_fft(x, T):
@@ -124,16 +127,15 @@ T = 1 / fs  # sample time
 nsamples = 1000  # amount of samples to transform
 
 # Create dictionary for the activities
-raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])
-raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c - 1])
-activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict()
+raw_signal = pd.DataFrame(raw_signal, columns=["signal", "label"])  # convert to pandas dataframe
+raw_signal["label"] = raw_signal["label"].transform(lambda c: activity_labels['activity'][c - 1])  # add labels
+activities_and_signals = raw_signal.groupby("label")["signal"].apply(list).to_dict()  # make dictionary
 
-## TODO: change length of signal we want to transform?
 for activity, signal in activities_and_signals.items():
-    signal = signal[0:nsamples]
-    signal = signal - np.mean(signal)
-    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
-    f, y = calculate_fft(signal, T) # fourier transform
+    signal = signal[0:nsamples]  # take nsamples from the signal
+    signal = signal - np.mean(signal)  # remove DC-offset
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal))  # create time axis
+    f, y = calculate_fft(signal, T)  # fourier transform
 
     # Plot
     plt.figure(figsize=(15, 6))
@@ -156,9 +158,9 @@ print()
 print("[Exercise 4.7]")
 
 nsamples = 3000  # amount of samples to transform
-fn = fs/2  # nyquist frequency
-upper_limit = 3/fn  # upper limit cutoff frequency
-lower_limit = 0.6/fn  # lower limit cutoff frequency
+fn = fs / 2  # nyquist frequency
+upper_limit = 3 / fn  # upper limit cutoff frequency
+lower_limit = 0.6 / fn  # lower limit cutoff frequency
 filter_order = 4  # order of the filters
 
 ## Low-pass filter
@@ -170,8 +172,8 @@ for activity, signal in activities_and_signals.items():
     signal = signal[0:nsamples]
     signal = signal - np.mean(signal)
     signal = lfilter(b_lp, a_lp, signal)
-    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
-    f, y = calculate_fft(signal, T) # fourier transform
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal))  # create time axis
+    f, y = calculate_fft(signal, T)  # fourier transform
 
     # Plot filtered signal
     plt.subplot(6, 2, i)
@@ -180,7 +182,7 @@ for activity, signal in activities_and_signals.items():
     plt.ylim(-1, 1)
     plt.legend(loc="upper right")
     if i == 1: plt.title("Low-pass filtered")
-    i +=1
+    i += 1
 
     # Plot frequency spectrum
     plt.subplot(6, 2, i)
@@ -189,7 +191,7 @@ for activity, signal in activities_and_signals.items():
     plt.xlim(0, 3)
     plt.legend(loc="upper right")
     if i == 2: plt.title("FFT")
-    i+=1
+    i += 1
 plt.tight_layout()
 plt.savefig("figures/4.7_lowpass.png", dpi=300)
 plt.close()
@@ -200,11 +202,11 @@ i = 1
 
 plt.figure(figsize=(15, 6))
 for activity, signal in activities_and_signals.items():
-    signal = signal[0:nsamples]
-    signal = signal - np.mean(signal)
-    signal = lfilter(b_hp, a_hp, signal)
-    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
-    f, y = calculate_fft(signal, T) # fourier transform
+    signal = signal[0:nsamples]  # take nsamples from the signal
+    signal = signal - np.mean(signal)  # remove DC-offset
+    signal = lfilter(b_hp, a_hp, signal)  # filter signal highpass
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal))  # create time axis
+    f, y = calculate_fft(signal, T)  # fourier transform
 
     # Plot filtered signal
     plt.subplot(6, 2, i)
@@ -222,22 +224,22 @@ for activity, signal in activities_and_signals.items():
     plt.xlim(0, 3)
     plt.legend(loc="upper right")
     if i == 2: plt.title("FFT")
-    i+=1
+    i += 1
 plt.tight_layout()
 plt.savefig("figures/4.7_highpass.png", dpi=300)
 plt.close()
 
 ## Band-pass filter
 b_bp, a_bp = butter(filter_order, [lower_limit, upper_limit], btype='bandpass', output='ba')
-i=1
+i = 1
 
 plt.figure(figsize=(15, 6))
 for activity, signal in activities_and_signals.items():
     signal = signal[0:nsamples]
     signal = signal - np.mean(signal)
     signal = lfilter(b_bp, a_bp, signal)
-    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal)) # create time axis
-    f, y = calculate_fft(signal, T) # fourier transform
+    t = np.linspace(start=0, stop=T * np.size(signal), num=np.size(signal))  # create time axis
+    f, y = calculate_fft(signal, T)  # fourier transform
 
     # Plot filtered signal
     plt.subplot(6, 2, i)

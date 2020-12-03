@@ -1,3 +1,5 @@
+## Assignment 4.9
+
 import sys
 import numpy as np
 import pandas as pd
@@ -8,14 +10,11 @@ from statsmodels.tsa.stattools import adfuller
 from statsmodels.tsa.seasonal import seasonal_decompose
 from statsmodels.tsa.stattools import acf, pacf
 from statsmodels.tsa.arima_model import ARIMA
-
 import warnings
-
-warnings.filterwarnings("ignore")
+warnings.filterwarnings("ignore")  # ARIMA gave warnings
 
 try:
     from IPython.display import clear_output
-
     have_ipython = True
 except ImportError:
     have_ipython = False
@@ -250,12 +249,12 @@ print("[Exercise 4.9]")
 file_countries = "Earth Surface Temperature Study/GlobalLandTemperaturesByCountry.csv"
 data_countries = pd.read_csv(file_countries)
 
-countries = ["Norway", "Finland", "Singapore", "Cambodia"]
+countries = ["Norway", "Finland", "Singapore", "Cambodia"]  # countries specified in the assignment
 data_countries = data_countries[data_countries["Country"].isin(countries)]  # remove data from other countries
 
 # Determine which years to plot to avoid NaN
 index_nan = data_countries["Country"].isin(countries) & data_countries["AverageTemperature"].isna()
-countries_grouped = data_countries[index_nan].groupby("Country")
+countries_grouped = data_countries[index_nan].groupby("Country")  # group data by country
 
 dates = []
 for country, group in countries_grouped:
@@ -271,12 +270,12 @@ timeline_per_country = {}
 plt.figure(figsize=(12, 8))
 for country, group in data_countries.groupby("Country"):
     start_index = pd.Series(group["dt"] == start_date)  # find start index
-    start_index = start_index[start_index].index.values
+    start_index = start_index[start_index].index.values  # get value
     plot_range = [int(start_index) - group.first_valid_index() + 1,
                   int(start_index) - group.first_valid_index() + npoints]
 
-    temperatures = group["AverageTemperature"].to_numpy()[plot_range[0]:plot_range[1]]
-    timeline = group["dt"].to_numpy()[plot_range[0]:plot_range[1]]
+    temperatures = group["AverageTemperature"].to_numpy()[plot_range[0]:plot_range[1]]  # convert to numpy array
+    timeline = group["dt"].to_numpy()[plot_range[0]:plot_range[1]]  # convert dates to numpy array
 
     # Plot
     plt.plot(timeline, temperatures, label=country)
@@ -302,21 +301,20 @@ plt.savefig("figures/4.9a_temperatures.png", dpi=300)
 print("[4.9a] Plot saved")
 print()
 
-# dtw = KnnDtw()
-# print("[4.9a] Table with minimal DTW distance")
-# HeaderRow = " DISTANCE ".ljust(10)
-# for i1, c1 in enumerate(countries):
-#     HeaderRow += c1.ljust(10)
-# print(HeaderRow)
-#
-# for i1, c1 in enumerate(countries):
-#     Row = (c1 + " ").rjust(10)
-#     for i2, c2 in enumerate(countries):
-#         distance, cost = dtw._dtw_distance(temperature_per_country[c1], temperature_per_country[c2])
-#         Row += str(int(distance)).ljust(10)
-#     print(Row)
-# print()
+dtw = KnnDtw()
+print("[4.9a] Table with minimal DTW distance")
+HeaderRow = " DISTANCE ".ljust(10)
+for i1, c1 in enumerate(countries):
+    HeaderRow += c1.ljust(10)
+print(HeaderRow)
 
+for i1, c1 in enumerate(countries):
+    Row = (c1 + " ").rjust(10)
+    for i2, c2 in enumerate(countries):
+        distance, cost = dtw._dtw_distance(temperature_per_country[c1], temperature_per_country[c2])
+        Row += str(int(distance)).ljust(10)
+    print(Row)
+print()
 
 #  DISTANCE Norway    Finland   Singapore Cambodia
 #    Norway 0         4046      47527     47779
@@ -358,10 +356,10 @@ def test_stationarity(timeseries, country, timeline, ex):
 
 print("[4.9b] Dickey-Fuller test results")
 plt.figure(figsize=(6, 4))
-# for country in temperature_per_country:
-#     plt.clf()
-#     test_stationarity(temperature_per_country[country], country, timeline_per_country[country], 'b')
-#     print()
+for country in temperature_per_country:
+    plt.clf()
+    test_stationarity(temperature_per_country[country], country, timeline_per_country[country], 'b')
+    print()
 
 ### 4.9c
 temperature_decompose = {}
@@ -384,20 +382,20 @@ plt.title("Decomposed temperatures")
 plt.tight_layout()
 plt.savefig("figures/4.9c.png", dpi=300)
 
-# dtw = KnnDtw()
-# print("[4.9c] Table with minimal DTW distance")
-# HeaderRow = " DISTANCE ".ljust(10)
-# for i1, c1 in enumerate(countries):
-#     HeaderRow += c1.ljust(10)
-# print(HeaderRow)
+dtw = KnnDtw()
+print("[4.9c] Table with minimal DTW distance")
+HeaderRow = " DISTANCE ".ljust(10)
+for i1, c1 in enumerate(countries):
+    HeaderRow += c1.ljust(10)
+print(HeaderRow)
 
-# for i1, c1 in enumerate(countries):
-#     Row = (c1 + " ").rjust(10)
-#     for i2, c2 in enumerate(countries):
-#         distance, cost = dtw._dtw_distance(temperature_decompose[c1], temperature_decompose[c2])
-#         Row += str(int(distance)).ljust(10)
-#     print(Row)
-# print()
+for i1, c1 in enumerate(countries):
+    Row = (c1 + " ").rjust(10)
+    for i2, c2 in enumerate(countries):
+        distance, cost = dtw._dtw_distance(temperature_decompose[c1], temperature_decompose[c2])
+        Row += str(int(distance)).ljust(10)
+    print(Row)
+print()
 
 #  DISTANCE Norway    Finland   Singapore Cambodia
 #    Norway 0         1437      1650      1454
