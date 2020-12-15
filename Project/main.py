@@ -129,7 +129,7 @@ for key in operation_groups.groups.keys() - [-1]:
 
 foperations_per_threshold = []
 ntypes_per_threshold = []
-nthresholds = 100
+nthresholds = 300
 for threshold in range(1,nthresholds):
     total_operations = 0
     operation_types = 0
@@ -148,13 +148,16 @@ ax.set_xlabel('Threshold')
 ax.set_ylabel('Fraction of total operations')
 ax2 = ax.twinx()
 ax2.plot(range(1,nthresholds), ntypes_per_threshold, color='darkmagenta', label='types')
+ax2.hlines(y=10, xmin=-10, xmax=nthresholds+10, colors='k')
 ax2.set_ylabel('Amount of operation types')
 fig.legend(bbox_to_anchor=(0.7, 0.85), loc='upper left', ncol=1)
-# plt.tight_layout()
+ax2.set_xlim(right=310, left=-10)
 plt.savefig('figures/threshold_operations.png', dpi=300)
 
-## TODO: justify
-threshold = 30
+noperations_goal = 20  # amount of operations to predict
+threshold = [n for n,i in enumerate(ntypes_per_threshold) if i < noperations_goal][0]
+print('Threshold is:', threshold)
+print('Percentage of data left:', foperations_per_threshold[threshold])
 
 target = 'Operatieduur'
 groups = data.fillna(-1).groupby('Operatietype')
