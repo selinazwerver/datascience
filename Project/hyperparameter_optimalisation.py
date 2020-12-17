@@ -6,8 +6,6 @@ warnings.filterwarnings('ignore')
 
 import pandas as pd
 import numpy as np
-from tabulate import tabulate
-
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
@@ -15,12 +13,14 @@ from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import RandomizedSearchCV
+from sklearn.model_selection import GridSearchCV
 import pyearth
 
 data_file = 'surgical_case_durations.csv'
 data = pd.read_csv(data_file, sep=';', encoding='ISO-8859-1')
 data_original = data  # might need it later
+
 
 # Replace values in dataset such that we can work with it
 def int_to_str_map(number):
@@ -77,6 +77,7 @@ def calc_variance_categorial(df, cols, target, show=False):
 
     return results
 
+
 data = preprocess_data(data)
 data_for_initial_r2 = data[data['Operatieduur'].notna()]
 data_for_initial_r2 = data_for_initial_r2[data_for_initial_r2['Geplande operatieduur'].notna()]
@@ -98,7 +99,7 @@ target = 'Operatieduur'
 categorial_variance = calc_variance_categorial(data, categorical_cols, target, False)
 
 ## Remove data
-threshold = 35  # determined to have 10 sugery types left : 61
+threshold = 61  # determined to have 10 sugery types left : 61
 operation_groups = data.fillna(-1).groupby('Operatietype')
 removed_types = []
 for key in operation_groups.groups.keys():
@@ -136,37 +137,86 @@ Y = data['Operatieduur']
 X = data[features[0:nfeatures]]
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
 
-# Linear regression
-LR = LinearRegression()
-LR.fit(X_train, Y_train)
-LR_predictions = LR.predict(X_test)
-result.append(['LR', mean_squared_error(Y_test, LR_predictions) ** (1 / 2), r2_score(Y_test, LR_predictions)])
+## Hyperparameter tuning
+## RANDOM FOREST
+n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]  # ntrees
+max_features = ['auto', 'sqrt']  # number of features to consider at every split
+max_depth = [int(x) for x in np.linspace(start=10, stop=110, num=11)]  # maximum number of levels in tree
+max_depth.append(None)
+min_samples_split = [int(x) for x in np.linspace(start=2, stop=10)]  # minimum number of samples required to split a node
+min_samples_leaf = [int(x) for x in np.linspace(start=2, stop=10)]  # minimum number of samples required at each leaf node
+bootstrap = [True, False]  # method of selecting samples for training each tree
 
-# Multivariate adaptive regression splines
-MARS = pyearth.Earth()
-MARS.fit(X_train, Y_train)
-MARS_predictions = MARS.predict(X_test)
-result.append(['MARS', mean_squared_error(Y_test, MARS_predictions) ** (1 / 2), r2_score(Y_test, MARS_predictions)])
+# Create the random grid
+rf_parameters = {'n_estimators': n_estimators,
+                 'max_features': max_features,
+                 'max_depth': max_depth,
+                 'min_samples_split': min_samples_split,
+                 'min_samples_leaf': min_samples_leaf,
+                 'bootstrap': bootstrap}
 
-# Random forest
-RF = RandomForestRegressor(n_estimators=1309, min_samples_split=3, min_samples_leaf=9, max_features='sqrt',
-                           max_depth=10, bootstrap=True, random_state=seed)
-RF.fit(X_train, Y_train)
-RF_predictions = RF.predict(X_test)
-result.append(['RF', mean_squared_error(Y_test, RF_predictions) ** (1 / 2), r2_score(Y_test, RF_predictions)])
+RF = RandomForestRegressor()
+# Random search of parameters, using 3 fold cross validation,
+# search across 100 different combinations, and use all available cores
+RF_random = RandomizedSearchCV(estimator=RF, param_distributions=rf_parameters, n_iter=200, cv=3, verbose=2,
+                               random_state=seed, n_jobs=-1)
+RF_random.fit(X_train, Y_train)  # fit the random search model
+print('Best parameters RF:')
+print(RF_random.best_params_)
+RF_predictions = RF_random.best_estimator_.predict(X_test)
+print('RF R2:', r2_score(Y_test, RF_predictions))
 
-# Multilayer perceptron network
-MLP = MLPRegressor(activation='relu', solver='adam')
-MLP.fit(X_train, Y_train)
-MLP_predictions = MLP.predict(X_test)
-result.append(['MLP', mean_squared_error(Y_test, MLP_predictions) ** (1 / 2), r2_score(Y_test, MLP_predictions)])
+# {'n_estimators': 1309, 'min_samples_split': 3, 'min_samples_leaf': 9, 'max_features': 'sqrt', 'max_depth': 10, 'bootstrap': True}
+# RF R2: 0.5869592658167844
 
-# Gradient boosting regression
-GBR = GradientBoostingRegressor(n_estimators=745, min_samples_split=6, min_samples_leaf=6, max_features='sqrt',
-                                max_depth=50, loss='ls', criterion='mse')
-GBR.fit(X_train, Y_train)
-GBR_predictions = GBR.predict(X_test)
-result.append(['GBR', mean_squared_error(Y_test, GBR_predictions) ** (1 / 2), r2_score(Y_test, GBR_predictions)])
+## MULTILAYER PERCEPTRON
+# hidden_layer_sizes = [(50,50,50), (50,1000,50),(100,)]  # nlayers
+# activation = ['identity', 'logistic', 'tanh', 'relu']  # activation function
+# solver = ['lbfgs', 'sgd', 'adam']  # solver for weight optimization
+# learning_rate = ['constant', 'adaptive', 'invscaling']
+# max_iter = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]
+# shuffle=[True, False]
+#
+# # Create the random grid
+# mlp_parameters = {'hidden_layer_sizes' : hidden_layer_sizes,
+#                   'activation' : activation,
+#                   'solver' : solver,
+#                   'learning_rate' : learning_rate,
+#                   'shuffle' : shuffle,
+#                   'max_iter' : max_iter}
+#
+# MLP = MLPRegressor()
+# MLP_grid = GridSearchCV(estimator=MLP, param_grid=mlp_parameters, cv=3, verbose=2, n_jobs=-1)
+# MLP_grid.fit(X_train, Y_train)  # fit the random search model
+# print('Best parameters MLP:')
+# print(MLP_grid.best_params_)
+# MLP_predictions = MLP_grid.best_estimator_.predict(X_test)
+# print('MLP R2:', r2_score(Y_test, MLP_predictions))
 
-print('MSE'.rjust(9), 'R2'.rjust(7))
-print(tabulate(result))
+## GRADIENT BOOSTEING REGRESSION
+loss = ['ls', 'lad' ,'huber', 'quantile']
+n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]
+criterion = ['friedman_mse', 'mse', 'mae']
+min_samples_split = [int(x) for x in np.linspace(start=2, stop=10)]
+min_samples_leaf = [int(x) for x in np.linspace(start=2, stop=10)]
+max_depth = [int(x) for x in np.linspace(start=10, stop=110, num=11)]
+max_features = ['auto', 'sqrt', 'log2']
+
+gbr_parameters = {'loss' : loss,
+                  'n_estimators' : n_estimators,
+                  'criterion' : criterion,
+                  'min_samples_split' : min_samples_split,
+                  'min_samples_leaf' : min_samples_leaf,
+                  'max_depth' : max_depth,
+                  'max_features' : max_features}
+
+GBR = GradientBoostingRegressor()
+GBR_random = RandomizedSearchCV(estimator=GBR, param_distributions=gbr_parameters, n_iter=200, cv=3, verbose=2,
+                               random_state=seed, n_jobs=-1)
+GBR_random.fit(X_train, Y_train)  # fit the random search model
+print('Best parameters GBR:')
+print(GBR_random.best_params_)
+GBR_predictions = GBR_random.best_estimator_.predict(X_test)
+print('GBR R2:', r2_score(Y_test, GBR_predictions))
+# {'n_estimators': 745, 'min_samples_split': 6, 'min_samples_leaf': 6, 'max_features': 'sqrt', 'max_depth': 50, 'loss': 'ls', 'criterion': 'mse'}
+# RF R2: 0.58685816869416

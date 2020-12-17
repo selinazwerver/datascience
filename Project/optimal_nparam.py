@@ -97,7 +97,7 @@ target = 'Operatieduur'
 categorial_variance = calc_variance_categorial(data, categorical_cols, target, False)
 
 ## Remove data
-threshold = 35  # determined to have 10 sugery types left : 61
+threshold = 61  # determined to have 10 surgery types left : 61
 operation_groups = data.fillna(-1).groupby('Operatietype')
 removed_types = []
 for key in operation_groups.groups.keys():
