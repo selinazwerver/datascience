@@ -10,8 +10,7 @@ from tabulate import tabulate
 
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
-from sklearn.metrics import r2_score
+from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import GradientBoostingRegressor
@@ -21,6 +20,13 @@ import pyearth
 data_file = 'surgical_case_durations.csv'
 data = pd.read_csv(data_file, sep=';', encoding='ISO-8859-1')
 data_original = data  # might need it later
+
+def mean_absolute_percentage_error(y_true, y_pred):
+    y_true, y_pred = np.array(y_true), np.array(y_pred)
+    return np.mean(np.abs((y_true - y_pred) / y_true)) * 100
+
+def calc_improvement(real, model):
+    return ((real - model)/real)*100
 
 # Replace values in dataset such that we can work with it
 def int_to_str_map(number):
@@ -81,7 +87,8 @@ data = preprocess_data(data)
 data_for_initial_r2 = data[data['Operatieduur'].notna()]
 data_for_initial_r2 = data_for_initial_r2[data_for_initial_r2['Geplande operatieduur'].notna()]
 r2_original = r2_score(data_for_initial_r2['Geplande operatieduur'], data_for_initial_r2['Operatieduur'])
-# print(r2_original)
+print('R2 of scheduled and actual surgery duration:', r2_original)
+print()
 
 ## Check which columns are numerical/categorial
 data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
@@ -140,33 +147,53 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random
 LR = LinearRegression()
 LR.fit(X_train, Y_train)
 LR_predictions = LR.predict(X_test)
-result.append(['LR', mean_squared_error(Y_test, LR_predictions) ** (1 / 2), r2_score(Y_test, LR_predictions)])
+result.append(['LR', mean_absolute_error(Y_test, LR_predictions),
+               mean_absolute_percentage_error(Y_test, LR_predictions),
+               mean_squared_error(Y_test, LR_predictions) ** (1 / 2),
+               r2_score(Y_test, LR_predictions),
+               calc_improvement(r2_original, r2_score(Y_test, LR_predictions))])
 
 # Multivariate adaptive regression splines
 MARS = pyearth.Earth()
 MARS.fit(X_train, Y_train)
 MARS_predictions = MARS.predict(X_test)
-result.append(['MARS', mean_squared_error(Y_test, MARS_predictions) ** (1 / 2), r2_score(Y_test, MARS_predictions)])
+result.append(['MARS', mean_absolute_error(Y_test, MARS_predictions),
+               mean_absolute_percentage_error(Y_test, MARS_predictions),
+               mean_squared_error(Y_test, MARS_predictions) ** (1 / 2),
+               r2_score(Y_test, MARS_predictions),
+               calc_improvement(r2_original, r2_score(Y_test, MARS_predictions))])
 
 # Random forest
 RF = RandomForestRegressor(n_estimators=1309, min_samples_split=3, min_samples_leaf=9, max_features='sqrt',
                            max_depth=10, bootstrap=True, random_state=seed)
 RF.fit(X_train, Y_train)
 RF_predictions = RF.predict(X_test)
-result.append(['RF', mean_squared_error(Y_test, RF_predictions) ** (1 / 2), r2_score(Y_test, RF_predictions)])
+result.append(['RF', mean_absolute_error(Y_test, RF_predictions),
+               mean_absolute_percentage_error(Y_test, RF_predictions),
+               mean_squared_error(Y_test, RF_predictions) ** (1 / 2),
+               r2_score(Y_test, RF_predictions),
+               calc_improvement(r2_original, r2_score(Y_test, RF_predictions))])
 
 # Multilayer perceptron network
 MLP = MLPRegressor(activation='relu', solver='adam')
 MLP.fit(X_train, Y_train)
 MLP_predictions = MLP.predict(X_test)
-result.append(['MLP', mean_squared_error(Y_test, MLP_predictions) ** (1 / 2), r2_score(Y_test, MLP_predictions)])
+result.append(['MLP', mean_absolute_error(Y_test, MLP_predictions),
+               mean_absolute_percentage_error(Y_test, MLP_predictions),
+               mean_squared_error(Y_test, MLP_predictions) ** (1 / 2),
+               r2_score(Y_test, MLP_predictions),
+               calc_improvement(r2_original, r2_score(Y_test, MLP_predictions))])
 
 # Gradient boosting regression
 GBR = GradientBoostingRegressor(n_estimators=745, min_samples_split=6, min_samples_leaf=6, max_features='sqrt',
                                 max_depth=50, loss='ls', criterion='mse')
 GBR.fit(X_train, Y_train)
 GBR_predictions = GBR.predict(X_test)
-result.append(['GBR', mean_squared_error(Y_test, GBR_predictions) ** (1 / 2), r2_score(Y_test, GBR_predictions)])
+result.append(['GBR', mean_absolute_error(Y_test, GBR_predictions),
+               mean_absolute_percentage_error(Y_test, GBR_predictions),
+               mean_squared_error(Y_test, GBR_predictions) ** (1 / 2),
+               r2_score(Y_test, GBR_predictions),
+               calc_improvement(r2_original, r2_score(Y_test, GBR_predictions))])
 
-print('MSE'.rjust(9), 'R2'.rjust(7))
+print('MAE'.rjust(9), 'MAPE'.rjust(9), 'RMSE'.rjust(8), 'R2'.rjust(6), 'Improvement'.rjust(10))
 print(tabulate(result))
