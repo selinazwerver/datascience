@@ -91,7 +91,6 @@ print('R2 of scheduled and actual surgery duration:', r2_original)
 print()
 
 ## Check which columns are numerical/categorial
-data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
 column_names = list(data.columns.values)
 numerical_cols = []
 categorical_cols = []
@@ -105,7 +104,7 @@ target = 'Operatieduur'
 categorial_variance = calc_variance_categorial(data, categorical_cols, target, False)
 
 ## Remove data
-threshold = 35  # determined to have 10 sugery types left : 61
+threshold = 61  # determined to have 10 sugery types left : 61
 operation_groups = data.fillna(-1).groupby('Operatietype')
 removed_types = []
 for key in operation_groups.groups.keys():
@@ -116,11 +115,18 @@ removed_types.append(-1)  # also remove nan group
 for key in removed_types:
     data = data.drop(operation_groups.get_group(key).index)
 
+# Remove large over/underestimation
+data['Difference'] = abs(data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
+data['Percentual diff'] = (data['Difference']/data['Geplande operatieduur']) * 100
+data = data.drop(data[data['Percentual diff'] > 100].index)
+
 ## Transform categories to numbers to be used in models
-for name, nkeys, var, frac in categorial_variance:
+order = []  # to store which number corresponds to which operation type
+for name in categorical_cols:
     data[name] = data[name].astype('category').cat.codes
 
 data = data[data['Operatieduur'].notna()]  # remove nan surgery durations
+
 all_features = [l[0] for l in categorial_variance]  # list of all features
 result = []
 options = ['LR', 'MARS', 'DT', 'RT', 'MLP']
@@ -185,8 +191,8 @@ result.append(['MLP', mean_absolute_error(Y_test, MLP_predictions),
                calc_improvement(r2_original, r2_score(Y_test, MLP_predictions))])
 
 # Gradient boosting regression
-GBR = GradientBoostingRegressor(n_estimators=745, min_samples_split=6, min_samples_leaf=6, max_features='sqrt',
-                                max_depth=50, loss='ls', criterion='mse')
+GBR = GradientBoostingRegressor(n_estimators=400, min_samples_split=4, min_samples_leaf=5, max_features='log2',
+                                max_depth=10, loss='ls', criterion='mae')
 GBR.fit(X_train, Y_train)
 GBR_predictions = GBR.predict(X_test)
 result.append(['GBR', mean_absolute_error(Y_test, GBR_predictions),
@@ -195,5 +201,49 @@ result.append(['GBR', mean_absolute_error(Y_test, GBR_predictions),
                r2_score(Y_test, GBR_predictions),
                calc_improvement(r2_original, r2_score(Y_test, GBR_predictions))])
 
-print('MAE'.rjust(9), 'MAPE'.rjust(9), 'RMSE'.rjust(8), 'R2'.rjust(6), 'Improvement'.rjust(10))
+print('MAE'.rjust(9), 'MAPE'.rjust(9), 'RMSE'.rjust(8), 'R2'.rjust(6), 'Improvement'.rjust(18))
 print(tabulate(result))
+
+# Including under/overestimation
+# ----  -------  -------  -------  --------  --------
+# LR    53.8461  84.6693  71.0762  0.229634   631.606
+# MARS  53.8461  84.6693  71.0762  0.229634   631.606
+# RF    39.8645  67.5816  56.9081  0.506148  1271.74
+# MLP   58.3685  86.8881  76.7941  0.1007     333.122
+# GBR   39.872   67.6068  56.9082  0.506146  1271.74
+# ----  -------  -------  -------  --------  --------
+
+# Excluding over/underestimation
+#       MAE      MAPE     RMSE     R2        Improvement
+# ----  -------  -------  -------  --------  --------
+# LR    54.1755  81.555   66.9023  0.213698   594.715
+# MARS  54.1755  81.555   66.9023  0.213698   594.715
+# RF    37.7966  65.5361  50.5671  0.550796  1375.1
+# MLP   54.9593  82.2013  69.1554  0.159844   470.041
+# GBR   37.8395  64.9577  50.6753  0.548872  1370.65
+# ----  -------  -------  -------  --------  --------
+
+# Determine statistics per operation type
+test_individual = pd.DataFrame([X_test['Operatietype'], Y_test]).transpose()
+
+order = ['AVR', 'AVR + MVP shaving', 'CABG', 'CABG + AVR', 'CABG + pacemaker tijdelijk',
+         'Lobectomie of segmentresectie', 'Mediastinoscopie', 'MVB', 'Rethoractomie', 'Wondtoilet']
+i = 0
+results_per_operation = []
+groups = test_individual.groupby(['Operatietype'])
+keys = groups.groups.keys()
+for key in keys:
+    group = groups.get_group(key)
+    X = pd.DataFrame(group['Operatietype'])
+    Y = pd.DataFrame(group['Operatieduur'])
+
+    r2_lr = mean_absolute_error(Y, LR.predict(X))
+    r2_MARS = mean_absolute_error(Y, MARS.predict(X))
+    r2_RF = mean_absolute_error(Y, RF.predict(X))
+    r2_MLP = mean_absolute_error(Y, MLP.predict(X))
+    r2_GBR = mean_absolute_error(Y, GBR.predict(X))
+    results_per_operation.append([order[i], r2_lr, r2_MARS, r2_RF, r2_MLP, r2_GBR])
+    i += 1
+
+print(tabulate(results_per_operation))
+

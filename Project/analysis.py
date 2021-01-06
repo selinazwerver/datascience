@@ -57,12 +57,14 @@ for name, values in data.iteritems():
 # plt.savefig("figures/nan_percentage.png", dpi=300)
 
 # Determine largest deviation in the data set
-# data['Difference'] = abs(data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
-# procentual_diff = ((data['Difference']/data['Geplande operatieduur']) * 100).to_list()
-# print('max:', max(procentual_diff), 'index:', procentual_diff.index(max(procentual_diff)), 'planned:',
-#       data['Geplande operatieduur'].loc[procentual_diff.index(max(procentual_diff))], 'real:',
-#       data['Operatieduur'].loc[procentual_diff.index(max(procentual_diff))])
-# print((sum(i > 100 for i in procentual_diff)/len(procentual_diff))*100)
+data['Difference'] = abs(data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
+procentual_diff = ((data['Difference']/data['Geplande operatieduur']) * 100).to_list()
+print('max:', max(procentual_diff), 'index:', procentual_diff.index(max(procentual_diff)), 'planned:',
+      data['Geplande operatieduur'].loc[procentual_diff.index(max(procentual_diff))], 'real:',
+      data['Operatieduur'].loc[procentual_diff.index(max(procentual_diff))])
+print((sum(i > 100 for i in procentual_diff)/len(procentual_diff))*100)
+
+exit()
 
 # Determine which features can be used to predict
 def calc_variance_categorial(df, cols, target, show=False):
