@@ -148,6 +148,7 @@ for name, values in data[features].iteritems():
 Y = data['Operatieduur']
 X = data[features[0:nfeatures]]
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
+baseline = data.loc[X_test.index.values, ['Geplande operatieduur']]
 
 # Linear regression
 LR = LinearRegression()
@@ -224,7 +225,7 @@ print(tabulate(result))
 # ----  -------  -------  -------  --------  --------
 
 # Determine statistics per operation type
-test_individual = pd.DataFrame([X_test['Operatietype'], Y_test]).transpose()
+test_individual = pd.concat([X_test['Operatietype'], Y_test, baseline], axis=1)
 
 order = ['AVR', 'AVR + MVP shaving', 'CABG', 'CABG + AVR', 'CABG + pacemaker tijdelijk',
          'Lobectomie of segmentresectie', 'Mediastinoscopie', 'MVB', 'Rethoractomie', 'Wondtoilet']
@@ -236,14 +237,40 @@ for key in keys:
     group = groups.get_group(key)
     X = pd.DataFrame(group['Operatietype'])
     Y = pd.DataFrame(group['Operatieduur'])
+    initial = pd.DataFrame(group['Geplande operatieduur'])
 
-    r2_lr = mean_absolute_error(Y, LR.predict(X))
-    r2_MARS = mean_absolute_error(Y, MARS.predict(X))
-    r2_RF = mean_absolute_error(Y, RF.predict(X))
-    r2_MLP = mean_absolute_error(Y, MLP.predict(X))
-    r2_GBR = mean_absolute_error(Y, GBR.predict(X))
-    results_per_operation.append([order[i], r2_lr, r2_MARS, r2_RF, r2_MLP, r2_GBR])
+    initial_error = mean_absolute_error(Y, initial)
+    print('Initial error of', order[i], ':', initial_error)
+
+    mae_LR = mean_absolute_error(Y, LR.predict(X))
+    imp_LR = calc_improvement(initial_error, mae_LR)
+    mae_MARS = mean_absolute_error(Y, MARS.predict(X))
+    imp_MARS = calc_improvement(initial_error, mae_MARS)
+    mae_RF = mean_absolute_error(Y, RF.predict(X))
+    imp_RF = calc_improvement(initial_error, mae_RF)
+    mae_MLP = mean_absolute_error(Y, MLP.predict(X))
+    imp_MLP = calc_improvement(initial_error, mae_MLP)
+    mae_GBR = mean_absolute_error(Y, GBR.predict(X))
+    imp_GBR = calc_improvement(initial_error, mae_GBR)
+    results_per_operation.append([order[i], mae_LR, imp_LR, mae_MARS, imp_MARS, mae_RF, imp_RF, mae_MLP, imp_MLP,
+                                  mae_GBR, imp_GBR])
     i += 1
-
+print()
+print("Surgery type", "LR".rjust(20), "MARS".rjust(20), "RF".rjust(7), "MLP".rjust(9), "GBR".rjust(9))
 print(tabulate(results_per_operation))
+
+# Surgery type                   LR                   MARS                 RF                 MLP                   GBR
+#                                MAE      Imp         MAE      Imp         MAE      Imp       MAE      Imp          MAE      Imp
+# -----------------------------  -------  ----------  -------  ----------  -------  --------  --------  ----------  -------  ---------
+# AVR                            50.8531   -36.9189   50.8531   -36.9189   34.141    8.07732   35.8449     3.48971  34.2035   7.9092
+# AVR + MVP shaving              31.2355   -24.1145   31.2355   -24.1145   24.728    1.74302   28.6486   -13.8353   24.9638   0.806122
+# CABG                           42.2516     1.45045  42.2516     1.45045  42.0027   2.0308    46.0161    -7.33014  42.0422   1.93879
+# CABG + AVR                     73.8985   -13.5841   73.8985   -13.5841   52.9545  18.6075    80.4568   -23.6644   53.0303  18.4909
+# CABG + pacemaker tijdelijk     74.2296   -72.682    74.2296   -72.682    36.6324  14.7812    76.0707   -76.9649   37.0959  13.703
+# Lobectomie of segmentresectie  31.875     12.069    31.875     12.069    31.875   12.069     31.875     12.069    31.875   12.069
+# Mediastinoscopie               85.0915   -58.7073   85.0915   -58.7073   47.2683  11.8381    72.4273   -35.0868   46.9231  12.4821
+# MVB                            97.4652  -409.146    97.4652  -409.146    14.1557  26.0522   117.528   -513.953    11.2143  41.4179
+# Rethoractomie                  56.1587  -156.562    56.1587  -156.562    18.483   15.5599    83.6204  -282.022    20        8.62944
+# Wondtoilet                     70.1032  -280.169    70.1032  -280.169    16.1534  12.4003   104.964   -469.218    16.16    12.3644
+# -----------------------------  -------  ----------  -------  ----------  -------  --------  --------  ----------  -------  ---------
 
