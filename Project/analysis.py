@@ -156,9 +156,9 @@ fig.legend(bbox_to_anchor=(0.7, 0.85), loc='upper left', ncol=1)
 ax2.set_xlim(right=310, left=-10)
 plt.savefig('figures/threshold_operations.png', dpi=300)
 
-noperations_goal = 20  # amount of operations to predict
+noperations_goal = 2  # amount of operations to predict
 threshold = [n for n,i in enumerate(ntypes_per_threshold) if i < noperations_goal][0]
-print('Threshold is:', threshold)
+print('Threshold for', noperations_goal, 'is:', threshold)
 print('Percentage of data left:', foperations_per_threshold[threshold])
 
 target = 'Operatieduur'

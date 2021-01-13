@@ -121,7 +121,7 @@ result = []
 options = ['LR', 'MARS', 'DT', 'RT', 'MLP']
 
 # Make models + predictions
-nfeatures = 1  # best result : 1
+nfeatures = 23  # best result : 1
 seed = 41  # to make results reproducable
 features = all_features[0:nfeatures]  # select right features
 features.append('Operatieduur')
@@ -165,7 +165,7 @@ RF_random.fit(X_train, Y_train)  # fit the random search model
 print('Best parameters RF:')
 print(RF_random.best_params_)
 RF_predictions = RF_random.best_estimator_.predict(X_test)
-print('RF R2:', r2_score(Y_test, RF_predictions))
+print('RF MSE:', mean_squared_error(Y_test, RF_predictions))
 
 # {'n_estimators': 1509,
 # 'min_samples_split': 9,

@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
@@ -77,10 +77,12 @@ def calc_variance_categorial(df, cols, target, show=False):
     return results
 
 data = preprocess_data(data)
-data_for_initial_r2 = data[data['Operatieduur'].notna()]
-data_for_initial_r2 = data_for_initial_r2[data_for_initial_r2['Geplande operatieduur'].notna()]
-r2_original = r2_score(data_for_initial_r2['Geplande operatieduur'], data_for_initial_r2['Operatieduur'])
-# print(r2_original)
+data_for_initial_mse = data[data['Operatieduur'].notna()]
+data_for_initial_mse = data_for_initial_mse[data_for_initial_mse['Geplande operatieduur'].notna()]
+mse_original = mean_squared_error(data_for_initial_mse['Geplande operatieduur'], data_for_initial_mse['Operatieduur'])
+# print(mse_original)
+# exit()
+
 
 ## Check which columns are numerical/categorial
 data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
@@ -112,8 +114,12 @@ for key in removed_types:
 for name, nkeys, var, frac in categorial_variance:
     data[name] = data[name].astype('category').cat.codes
 
+
 data = data[data['Operatieduur'].notna()]  # remove nan surgery durations
+
 all_features = [l[0] for l in categorial_variance]  # list of all features
+
+## Store results
 result = []
 result_LR = []
 result_MARS = []
@@ -146,31 +152,31 @@ for nfeatures in range(1, len(all_features)):
     LR = LinearRegression()
     LR.fit(X_train, Y_train)
     LR_predictions = LR.predict(X_test)
-    result_LR.append(r2_score(Y_test, LR_predictions))
+    result_LR.append(mean_absolute_error(Y_test, LR_predictions))
 
     # Multivariate adaptive regression splines
     MARS = pyearth.Earth()
     MARS.fit(X_train, Y_train)
     MARS_predictions = MARS.predict(X_test)
-    result_MARS.append(r2_score(Y_test, MARS_predictions))
+    result_MARS.append(mean_absolute_error(Y_test, MARS_predictions))
 
     # Random forest
     RF = RandomForestRegressor(random_state=seed)
     RF.fit(X_train, Y_train)
     RF_predictions = RF.predict(X_test)
-    result_RF.append(r2_score(Y_test, RF_predictions))
+    result_RF.append(mean_absolute_error(Y_test, RF_predictions))
 
     # Multilayer perceptron network
     MLP = MLPRegressor()
     MLP.fit(X_train, Y_train)
     MLP_predictions = MLP.predict(X_test)
-    result_MLP.append(r2_score(Y_test, MLP_predictions))
+    result_MLP.append(mean_absolute_error(Y_test, MLP_predictions))
 
     # Gradient booster regression
     GBR = GradientBoostingRegressor()
     GBR.fit(X_train, Y_train)
     GBR_predictions = GBR.predict(X_test)
-    result_GBR.append(r2_score(Y_test, GBR_predictions))
+    result_GBR.append(mean_absolute_error(Y_test, GBR_predictions))
 
 plt.figure()
 plt.plot(range(1, len(all_features)), result_LR, label='LR')
@@ -180,7 +186,7 @@ plt.plot(range(1, len(all_features)), result_MLP, label='MLP')
 plt.plot(range(1, len(all_features)), result_GBR, label='GBR')
 plt.legend()
 plt.xlabel('Amount of variables')
-plt.ylabel('R2')
+plt.ylabel('MAE')
 plt.grid()
-plt.savefig('figures/r2_per_feature_amount.png', dpi=300)
+plt.savefig('figures/mae_per_feature_amount.png', dpi=300)
 plt.show()
