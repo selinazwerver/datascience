@@ -71,33 +71,26 @@ def calc_variance_categorial(df, cols, target, show=True):
 
     results = sorted(results, key=lambda x: x[4]) # sort results based on fraction of variance
 
-    # if show: # print results
-    #     for feature, nkeys, var, frac in results:
-    #         print(feature, '& %.2f' % frac)
-
     return results
 
 data = preprocess_data(data)
 data_for_initial_mse = data[data['Operatieduur'].notna()]
 data_for_initial_mse = data_for_initial_mse[data_for_initial_mse['Geplande operatieduur'].notna()]
 mse_original = mean_squared_error(data_for_initial_mse['Geplande operatieduur'], data_for_initial_mse['Operatieduur'])
-# print(mse_original)
-# exit()
-
 
 ## Check which columns are numerical/categorial
-data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
-column_names = list(data.columns.values)
+data_temp = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
+column_names = list(data_temp.columns.values)
 numerical_cols = []
 categorical_cols = []
 for col in column_names:
     try:
-        data[col] = data[col].apply(lambda x: float(x))
+        data_temp[col] = data_temp[col].apply(lambda x: float(x))
         numerical_cols.append(col)
     except Exception as e:
         categorical_cols.append(col)
 target = 'Operatieduur'
-categorial_variance = calc_variance_categorial(data, categorical_cols, target, False)
+# categorial_variance = calc_variance_categorial(data_temp, categorical_cols, target, False)
 
 ## Remove data
 threshold = 61  # determined to have 10 surgery types left : 61
@@ -112,13 +105,13 @@ for key in removed_types:
     data = data.drop(operation_groups.get_group(key).index)
 
 ## Transform categories to numbers to be used in models
-for name, var, frac, miss, total in categorial_variance:
+for name in categorical_cols:
     data[name] = data[name].astype('category').cat.codes
 
 
 data = data[data['Operatieduur'].notna()]  # remove nan surgery durations
 
-all_features = [l[0] for l in categorial_variance]  # list of all features
+all_features = categorical_cols  # list of all features
 
 ## Store results
 result = []
@@ -140,11 +133,16 @@ for nfeatures in range(1, len(all_features)):
     # Remove nan groups
     data_clean = data
     for name, values in data_clean[features].iteritems():
+        data_clean = data_clean.fillna(-1)
         groups = data_clean.groupby(name)
         keys = groups.groups.keys()
         for key in keys:
             if key == -1:  # remove nan group (-1)
                 data_clean = data_clean.drop(groups.get_group(key).index)
+
+    data_clean['Difference'] = abs(data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
+    data_clean['Percentual diff'] = (data_clean['Difference'] / data['Geplande operatieduur']) * 100
+    data_clean = data_clean.drop(data_clean[data_clean['Percentual diff'] > 100].index)
 
     Y = data_clean['Operatieduur']
     X = data_clean[features[0:nfeatures]]
@@ -183,11 +181,11 @@ for nfeatures in range(1, len(all_features)):
     result_GBR.append(mean_absolute_error(Y_test, GBR_predictions))
 
 plt.figure()
-plt.plot(range(1, len(all_features)), result_LR, label='LR')
-plt.plot(range(1, len(all_features)), result_MARS, label='MARS')
-plt.plot(range(1, len(all_features)), result_RF, label='RF')
-plt.plot(range(1, len(all_features)), result_MLP, label='MLP')
-plt.plot(range(1, len(all_features)), result_GBR, label='GBR')
+plt.plot(range(1, len(all_features)), result_LR, label='LR', color='orangered')
+plt.plot(range(1, len(all_features)), result_MARS, label='MARS', color='coral')
+plt.plot(range(1, len(all_features)), result_RF, label='RF', color='indigo')
+plt.plot(range(1, len(all_features)), result_MLP, label='MLP', color='mediumvioletred')
+plt.plot(range(1, len(all_features)), result_GBR, label='GBR', color='plum')
 plt.legend()
 plt.xlabel('Amount of variables')
 plt.ylabel('MAE')

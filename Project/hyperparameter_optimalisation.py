@@ -116,7 +116,6 @@ data['Percentual diff'] = (data['Difference']/data['Geplande operatieduur']) * 1
 data = data.drop(data[data['Percentual diff'] > 100].index)
 
 ## Transform categories to numbers to be used in models
-order = []  # to store which number corresponds to which operation type
 for name in categorical_cols:
     data[name] = data[name].astype('category').cat.codes
 

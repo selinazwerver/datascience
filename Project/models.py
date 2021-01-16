@@ -14,7 +14,7 @@ from sklearn.metrics import mean_squared_error, r2_score, mean_absolute_error
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 import pyearth
 
 data_file = 'surgical_case_durations.csv'
@@ -52,11 +52,12 @@ def preprocess_data(df):
 
 
 # Determine which features can be used to predict
-def calc_variance_categorial(df, cols, target, show=False):
+def calc_variance_categorial(df, cols, target, show=True):
     results = []
 
     for name, col in df[cols].iteritems():
         total_var = 0
+        total_size = 0
         groups = df.fillna(-1).groupby(name)  # replace nan and group
         keys = groups.groups.keys()
         # keys = keys - [-1]  # ignore nan
@@ -73,15 +74,18 @@ def calc_variance_categorial(df, cols, target, show=False):
                 var = group[target].var()  # calculate variance of the target column for the group
             weight = len(group) / nTarget  # calculate weight of variance
             total_var += var * weight  # sum variances
-        results.append([name, len(keys), total_var, total_var / varTarget])
+        missing_percentage = len(groups.get_group(-1))/len(col)
+        results.append([name, total_var, total_var / varTarget, missing_percentage*100,
+                        (total_var/varTarget)/(1-missing_percentage)])
 
-    results = sorted(results, key=lambda x: x[2])  # sort results based on fraction of variance
-
-    if show:  # print results
-        for feature, nkeys, var, frac in results:
-            print(feature, '& %.2f' % frac)
+    results = sorted(results, key=lambda x: x[4]) # sort results based on fraction of variance
 
     return results
+
+def onehotencode(data):
+    enc = OneHotEncoder()
+    enc.fit(data)
+    return enc.transform(data).toarray()
 
 data = preprocess_data(data)
 # data_for_initial_r2 = data[data['Operatieduur'].notna()]
@@ -124,7 +128,6 @@ data = data.drop(data[data['Percentual diff'] > 100].index)
 order = []  # to store which number corresponds to which operation type
 for name in categorical_cols:
     data[name] = data[name].astype('category').cat.codes
-
 data = data[data['Operatieduur'].notna()]  # remove nan surgery durations
 
 all_features = [l[0] for l in categorial_variance]  # list of all features
@@ -132,12 +135,13 @@ result = []
 options = ['LR', 'MARS', 'DT', 'RT', 'MLP']
 
 # Make models + predictions
-nfeatures = 4  # best result : 1
+nfeatures = 3  # amount of features to take into accoutn
 seed = 41  # to make results reproducable
 features = all_features[0:nfeatures]  # select right features
 features.append('Operatieduur')
 
 # Remove nan groups
+data = data.fillna(-1)
 for name, values in data[features].iteritems():
     groups = data.groupby(name)
     keys = groups.groups.keys()
@@ -147,6 +151,8 @@ for name, values in data[features].iteritems():
 
 Y = data['Operatieduur']
 X = data[features[0:nfeatures]]
+X_mlp = onehotencode(data[features[0:nfeatures]])  # one hot encoding for mlp to use
+X_train_mlp, X_test_mlp, Y_train_mlp, Y_test_mlp = train_test_split(X_mlp, Y, test_size=0.20, random_state=seed)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
 baseline = data.loc[X_test.index.values, ['Geplande operatieduur']]
 
@@ -184,13 +190,23 @@ result.append(['RF', mean_absolute_error(Y_test, RF_predictions),
 
 # Multilayer perceptron network
 MLP = MLPRegressor(activation='relu', solver='adam', random_state=seed)
-MLP.fit(X_train, Y_train)
-MLP_predictions = MLP.predict(X_test)
-result.append(['MLP', mean_absolute_error(Y_test, MLP_predictions),
-               mean_absolute_percentage_error(Y_test, MLP_predictions),
-               mean_squared_error(Y_test, MLP_predictions) ** (1 / 2),
+MLP.fit(X_train_mlp, Y_train_mlp)
+MLP_predictions = MLP.predict(X_test_mlp)
+result.append(['MLP', mean_absolute_error(Y_test_mlp, MLP_predictions),
+               mean_absolute_percentage_error(Y_test_mlp, MLP_predictions),
+               mean_squared_error(Y_test_mlp, MLP_predictions) ** (1 / 2),
                # r2_score(Y_test, MLP_predictions),
-               calc_improvement(mean_absolute_error(Y_test, baseline), mean_absolute_error(Y_test, MLP_predictions))])
+               calc_improvement(mean_absolute_error(Y_test_mlp, baseline), mean_absolute_error(Y_test_mlp, MLP_predictions))])
+
+
+# MLP = MLPRegressor(activation='relu', solver='adam', random_state=seed)
+# MLP.fit(X_train, Y_train)
+# MLP_predictions = MLP.predict(X_test)
+# result.append(['MLP', mean_absolute_error(Y_test, MLP_predictions),
+#                mean_absolute_percentage_error(Y_test, MLP_predictions),
+#                mean_squared_error(Y_test, MLP_predictions) ** (1 / 2),
+#                # r2_score(Y_test, MLP_predictions),
+#                calc_improvement(mean_absolute_error(Y_test, baseline), mean_absolute_error(Y_test, MLP_predictions))])
 
 # Gradient boosting regression
 GBR = GradientBoostingRegressor(n_estimators=52, min_samples_split=2, min_samples_leaf=4, max_features='sqrt',
@@ -215,8 +231,11 @@ print(tabulate(result))
 # GBR   35.9821  21.6276  48.4924   8.10679
 # ----  -------  -------  -------  --------
 
+
 # Determine statistics per operation type
 test_individual = pd.concat([X_test[features[0:nfeatures]], Y_test, baseline], axis=1)
+test_individual['New index'] = range(0, len(test_individual))
+test_individual = test_individual.set_index('New index')
 
 order = ['AVR', 'AVR + MVP shaving', 'CABG', 'CABG + AVR', 'CABG + pacemaker tijdelijk',
          'Lobectomie of segmentresectie', 'Mediastinoscopie', 'MVB', 'Rethoractomie', 'Wondtoilet']
@@ -231,17 +250,16 @@ nobservations = []
 
 groups = test_individual.groupby(['Operatietype'])
 keys = groups.groups.keys()
-print(keys)
 
 for key in keys:
     group = groups.get_group(key)
     X = pd.DataFrame(group[features[0:nfeatures]])
+    X_mlp = X_test_mlp[X.index]
+
     Y = pd.DataFrame(group['Operatieduur'])
     Y_list = Y.values
+
     initial = pd.DataFrame(group['Geplande operatieduur'])
-    # print(initial)
-    # print(np.mean(initial.values))
-    # exit()
     nobservations.append([order[i], len(group)])  # amount of observations
 
     initial_error = mean_absolute_error(Y, initial)
@@ -274,7 +292,7 @@ for key in keys:
     std_RF   = stats.stdev(error_RF)
     results_per_operation_RF.append([order[i], mae_RF, mape_RF, imp_RF, std_RF])
 
-    pred_MLP  = MLP.predict(X)
+    pred_MLP  = MLP.predict(X_mlp)
     mae_MLP   = mean_absolute_error(Y, pred_MLP)
     mape_MLP  = mean_absolute_percentage_error(Y, pred_MLP)
     # r2_MLP    = r2_score(Y, pred_MLP)
@@ -303,16 +321,14 @@ print()
 print("Amount of observations per surgery in the test set")
 print(tabulate(nobservations))
 # -----------------------------  ---
-# AVR                             78
-# AVR + MVP shaving               12
-# CABG                           237
-# CABG + AVR                      33
-# CABG + pacemaker tijdelijk      73
-# Lobectomie of segmentresectie    8
-# Mediastinoscopie                13
-# MVB                             14
-# Rethoractomie                    9
-# Wondtoilet                      25
+# AVR                             75
+# AVR + MVP shaving               14
+# CABG                           223
+# CABG + AVR                      36
+# CABG + pacemaker tijdelijk      69
+# Lobectomie of segmentresectie    2
+# Mediastinoscopie                20
+# MVB                              2
 # -----------------------------  ---
 print()
 print("Mean duration and standard deviation")
@@ -320,16 +336,16 @@ print("Mean duration and standard deviation")
 print(tabulate(mean_duration))
 
 #                                Mean in  Stdev in  Mean LR  Stdev LR  MeanMARS StdevMARS Mean RF   Stdev RF  MeanMLP  StdevMLP  MeanGBR  StdevGBR
-# -----------------------------  -------  --------  -------  --------  -------  --------  --------  --------  -------  --------  -------  --------
-# AVR                            211.147  38.4218   221.764  15.3431   218.526  14.815    213.081    6.04332  207.543  12.3995   213.069   6.66047
-# AVR + MVP shaving              225.143  28.7639   223.125  10.5646   221.773  10.203    213.205    7.37971  222.37    1.66794  214.266   6.23398
-# CABG                           226.713  25.5649   226.309  18.2439   226.739  17.6003   227.166   22.0159   228.88   28.2591   227.847  23.2988
-# CABG + AVR                     246.528  49.7028   264.591   9.18305  265.688   8.86874  266.885    5.23939  241.656   1.30258  266.368   2.71198
-# CABG + pacemaker tijdelijk     241.725  40.8566   257.662  18.5566   260.93   17.9215   261.443   10.8288   255.2     2.63222  262.211  11.8553
-# Lobectomie of segmentresectie  156      12.7279   196.742  37.8536   204.081  36.5047   185.761    8.6561   182.746  89.199    189.599  10.4221
-# Mediastinoscopie               222.95   53.2388   232.34   16.4771   240.35   15.89     234.962   18.4711   270.527  38.8705   236.383  19.3768
-# MVB                             55       7.07107  230.466   0        142.091   0         52.9129   0        269.963   0         57.343   0
-# -----------------------------  -------  --------  -------  --------  -------  --------  --------  --------  -------  --------  -------  --------
+# -----------------------------  -------  --------  -------  -------  -------  --------  --------  --------  -------  --------  --------  --------
+# AVR                            211.147  38.4218   221.696  15.2907  218.482  14.7933   212.302    6.67019  205.857  14.2966   213.222    7.03028
+# AVR + MVP shaving              225.143  28.7639   223.032  10.5272  221.703  10.2189   213.166    7.77835  221.57    2.12883  214.64     7.15527
+# CABG                           226.713  25.5649   226.183  18.1872  226.758  17.4533   227.215   22.841    227.932  31.1989   227.718   23.2284
+# CABG + AVR                     246.528  49.7028   264.311   9.1505  265.659   8.88251  266.207    5.06059  240.913   1.50812  267.379    2.49655
+# CABG + pacemaker tijdelijk     241.725  40.8566   257.386  18.4908  260.88   17.9493   260.862    9.78178  255.075   3.04753  262.359   11.8633
+# Lobectomie of segmentresectie  156      12.7279   196.627  37.7547  204.736  35.7473   187.053    5.29536  175.27   95.8353   177.119    5.7474
+# Mediastinoscopie               222.95   53.2388   232.108  16.4341  240.357  15.5603   236.227   17.0393   270.682  42.2325   235.581   19.5909
+# MVB                             55       7.07107  230.215   0       142.157   0         62.2191   0        268.02    0         58.3342   0
+# -----------------------------  -------  --------  -------  -------  -------  --------  --------  --------  -------  --------  --------  --------
 
 print()
 print("LR")
@@ -358,66 +374,68 @@ print(tabulate(results_per_operation_GBR))
 
 # LR
 # Surgery type                   MAE       MAPE      Imp         Std
-# -----------------------------  --------  --------  ----------  -------
-# AVR                             38.4632   24.3623   -24.1816   32.1299
-# AVR + MVP shaving               29.3478   13.2542   -16.3934   20.9724
-# CABG                            34.6957   24.4646     4.69144  30.2892
-# CABG + AVR                      49.4656   17.3963    28.3973   44.0589
-# CABG + pacemaker tijdelijk      34.4615   17.3627    16.4203   30.5547
-# Lobectomie of segmentresectie   50.758    20.312     44.5268    1.0373
-# Mediastinoscopie                57.5727   40.7425   -26.2559   48.8231
-# MVB                            169.966   320.228   -623.258    26.163
-# -----------------------------  --------  --------  ----------  -------
+# -----------------------------  --------  --------  ---------  --------
+# AVR                             38.4275   24.3403   -24.0662  32.1103
+# AVR + MVP shaving               29.3695   13.2519   -16.4797  20.997
+# CABG                            34.7114   24.4521     4.6483  30.2847
+# CABG + AVR                      49.5217   17.3918    28.3159  44.1142
+# CABG + pacemaker tijdelijk      34.487    17.3438    16.3583  30.5608
+# Lobectomie of segmentresectie   50.8732   20.3171    44.4008   1.13622
+# Mediastinoscopie                57.5341   40.6968   -26.1713  48.7947
+# MVB                            169.715   319.771   -622.191   26.163
+# -----------------------------  --------  --------  ---------  --------
 #
 # MARS
 # Surgery type                   MAE      MAPE      Imp        Std
-# -----------------------------  -------  --------  ---------  --------
-# AVR                            37.4516   23.5902   -20.9158  31.5338
-# AVR + MVP shaving              29.6237   13.2321   -17.4879  21.4708
-# CABG                           34.5894   24.4113     4.9835  30.1728
-# CABG + AVR                     49.1634   17.3943    28.8346  43.9257
-# CABG + pacemaker tijdelijk     33.9956   17.3724    17.5503  30.5255
-# Lobectomie of segmentresectie  43.4187   18.7608    52.5479   2.38612
-# Mediastinoscopie               58.1638   42.1678   -27.5522  49.7223
-# MVB                            81.591   159.087   -247.196   26.163
-# -----------------------------  -------  --------  ---------  --------
+# -----------------------------  -------  --------  ----------  --------
+# AVR                            37.4449   23.5777   -20.894    31.52
+# AVR + MVP shaving              29.6301   13.2324   -17.5132   21.5163
+# CABG                           34.6569   24.3986     4.79815  30.2584
+# CABG + AVR                     49.1723   17.3945    28.8217   43.928
+# CABG + pacemaker tijdelijk     34.0056   17.3747    17.5261   30.5239
+# Lobectomie of segmentresectie  42.7639   18.5201    53.2635    3.14355
+# Mediastinoscopie               58.0467   42.1469   -27.2953   49.608
+# MVB                            81.6569  159.207   -247.476    26.163
+# -----------------------------  -------  --------  ----------  --------
 #
 # RF
-# Surgery type                   MAE      MAPE     Imp        Std
-# -----------------------------  -------  -------  ---------  -------
-# AVR                            34.2199  21.786   -10.4819   30.0076
-# AVR + MVP shaving              32.1754  13.4644  -27.6077   25.1581
-# CABG                           34.2922  24.9422    5.79988  30.3288
-# CABG + AVR                     49.6827  17.2075   28.0829   44.2948
-# CABG + pacemaker tijdelijk     33.3296  16.4904   19.1655   30.5054
-# Lobectomie of segmentresectie  61.7388  24.0068   32.5259   30.2348
-# Mediastinoscopie               48.45    41.4977   -6.25     43.3162
-# MVB                            18.5     29.5024   21.2766   10.7297
-# -----------------------------  -------  -------  ---------  -------
+# Surgery type                   MAE      MAPE      Imp         Std
+# -----------------------------  -------  -------  ---------  --------
+# AVR                            34.2482  21.693   -10.5732   29.9559
+# AVR + MVP shaving              32.1106  13.4795  -27.3506   25.3002
+# CABG                           34.2837  25.04      5.82334  30.4274
+# CABG + AVR                     49.7105  17.1828   28.0427   44.4776
+# CABG + pacemaker tijdelijk     33.3405  16.3474   19.139    30.5624
+# Lobectomie of segmentresectie  60.4466  23.4782   33.9381   33.5955
+# Mediastinoscopie               48.45    41.5716   -6.25     43.8603
+# MVB                            18.5     34.6912   21.2766    2.43118
+# -----------------------------  -------  -------  ---------  --------
 #
 # MLP
-# Surgery type                   MAE       MAPE      Imp         Std
+# Surgery type                   MAE      MAPE      Imp         Std
 # -----------------------------  --------  --------  ----------  -------
-# AVR                             33.3995   21.481     -7.83323  30.8704
-# AVR + MVP shaving               32.2579   13.0828   -27.9349   18.028
-# CABG                            37.0348   25.4287    -1.7339   31.3805
-# CABG + AVR                      58.1447   19.3488    15.8339   49.475
-# CABG + pacemaker tijdelijk      34.5887   15.5487    16.1118   33.1082
-# Lobectomie of segmentresectie   64.7539   31.1083    29.2307   50.3081
-# Mediastinoscopie                77.8721   53.4148   -70.7723   63.1386
-# MVB                            209.463   392.248   -791.334    26.163
+# AVR                             33.5896   21.4365    -8.44683  31.2324
+# AVR + MVP shaving               32.4777   13.0958   -28.8067   18.5176
+# CABG                            37.6662   25.6327    -3.46843  32.1828
+# CABG + AVR                      58.5795   19.4773    15.2046   49.626
+# CABG + pacemaker tijdelijk      34.709    15.5582    15.8201   33.1873
+# Lobectomie of segmentresectie   72.2299   33.534     21.0602   56.9444
+# Mediastinoscopie                79.7126   54.1363   -74.8083   64.2461
+# MVB                            207.52    388.705   -783.065    26.163
 # -----------------------------  --------  --------  ----------  -------
 #
 # GBR
-# Surgery type                   MAE      MAPE     Imp        Std
+# Surgery type                   MAE      MAPE      Imp         Std
 # -----------------------------  -------  -------  ---------  --------
-# AVR                            34.3016  21.8209  -10.7457   30.0326
-# AVR + MVP shaving              32.0911  13.3618  -27.2734   24.2126
-# CABG                           34.3418  25.173     5.66358  30.603
-# CABG + AVR                     49.0686  17.1443   28.9719   44.6093
-# CABG + pacemaker tijdelijk     33.3293  16.6504   19.1663   30.4773
-# Lobectomie of segmentresectie  57.9007  22.4367   36.7205   49.313
-# Mediastinoscopie               48.45    41.8085   -6.25     43.6191
-# MVB                            18.5     31.9724   21.2766    4.46467
+# AVR                            34.4062  21.871   -11.0832   30.0615
+# AVR + MVP shaving              31.8084  13.3678  -26.1523   24.2442
+# CABG                           34.3319  25.152     5.69086  30.5673
+# CABG + AVR                     48.899   17.1676   29.2173   44.3774
+# CABG + pacemaker tijdelijk     33.3231  16.6623   19.1812   30.4802
+# Lobectomie of segmentresectie  70.3814  27.5424   23.0805   33.1435
+# Mediastinoscopie               48.45    41.6988   -6.25     43.3673
+# MVB                            18.5     32.5251   21.2766    3.06293
 # -----------------------------  -------  -------  ---------  --------
+
+
 
