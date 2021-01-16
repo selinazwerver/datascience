@@ -1,12 +1,10 @@
-### Contains the models for the predictions
-
 import warnings
-
 warnings.filterwarnings('ignore')
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+from tabulate import tabulate
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, mean_absolute_error
@@ -45,11 +43,12 @@ def preprocess_data(df):
 
 
 # Determine which features can be used to predict
-def calc_variance_categorial(df, cols, target, show=False):
+def calc_variance_categorial(df, cols, target, show=True):
     results = []
 
     for name, col in df[cols].iteritems():
         total_var = 0
+        total_size = 0
         groups = df.fillna(-1).groupby(name)  # replace nan and group
         keys = groups.groups.keys()
         # keys = keys - [-1]  # ignore nan
@@ -66,13 +65,15 @@ def calc_variance_categorial(df, cols, target, show=False):
                 var = group[target].var()  # calculate variance of the target column for the group
             weight = len(group) / nTarget  # calculate weight of variance
             total_var += var * weight  # sum variances
-        results.append([name, len(keys), total_var, total_var / varTarget])
+        missing_percentage = len(groups.get_group(-1))/len(col)
+        results.append([name, total_var, total_var / varTarget, missing_percentage*100,
+                        (total_var/varTarget)/(1-missing_percentage)])
 
-    results = sorted(results, key=lambda x: x[2])  # sort results based on fraction of variance
+    results = sorted(results, key=lambda x: x[4]) # sort results based on fraction of variance
 
-    if show:  # print results
-        for feature, nkeys, var, frac in results:
-            print(feature, '& %.2f' % frac)
+    # if show: # print results
+    #     for feature, nkeys, var, frac in results:
+    #         print(feature, '& %.2f' % frac)
 
     return results
 
@@ -111,7 +112,7 @@ for key in removed_types:
     data = data.drop(operation_groups.get_group(key).index)
 
 ## Transform categories to numbers to be used in models
-for name, nkeys, var, frac in categorial_variance:
+for name, var, frac, miss, total in categorial_variance:
     data[name] = data[name].astype('category').cat.codes
 
 
@@ -129,6 +130,7 @@ result_GBR = []
 
 # Make models + predictions
 seed = 41  # to make results reproducable
+remaining_data = []
 
 for nfeatures in range(1, len(all_features)):
 
@@ -147,6 +149,8 @@ for nfeatures in range(1, len(all_features)):
     Y = data_clean['Operatieduur']
     X = data_clean[features[0:nfeatures]]
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
+
+    remaining_data.append([nfeatures, len(data_clean.groupby('Operatietype').groups.keys()), len(Y_train), len(Y_test)])
 
     # Linear regression
     LR = LinearRegression()
@@ -173,7 +177,7 @@ for nfeatures in range(1, len(all_features)):
     result_MLP.append(mean_absolute_error(Y_test, MLP_predictions))
 
     # Gradient booster regression
-    GBR = GradientBoostingRegressor()
+    GBR = GradientBoostingRegressor(random_state=seed)
     GBR.fit(X_train, Y_train)
     GBR_predictions = GBR.predict(X_test)
     result_GBR.append(mean_absolute_error(Y_test, GBR_predictions))
@@ -189,4 +193,10 @@ plt.xlabel('Amount of variables')
 plt.ylabel('MAE')
 plt.grid()
 plt.savefig('figures/mae_per_feature_amount.png', dpi=300)
-plt.show()
+# plt.show()
+
+print('#f', '#o'.rjust(3), 'train'.rjust(6), 'test')
+print(tabulate(remaining_data))
+print()
+print('#f', 'LR'.rjust(3), 'MARS'.rjust(10), 'RF'.rjust(6), 'MLP'.rjust(9), 'GBR'.rjust(8))
+print(tabulate(np.array([range(1,len(all_features)), result_LR, result_MARS, result_RF, result_MLP, result_GBR]).T))

@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
-import math
 import matplotlib.pyplot as plt
-import seaborn as sn
+from tabulate import tabulate
+
+print('[Analysis]')
 
 data_file = 'surgical_case_durations.csv'
 data = pd.read_csv(data_file, sep=';', encoding='ISO-8859-1')
@@ -64,14 +65,13 @@ print('max:', max(procentual_diff), 'index:', procentual_diff.index(max(procentu
       data['Operatieduur'].loc[procentual_diff.index(max(procentual_diff))])
 print((sum(i > 100 for i in procentual_diff)/len(procentual_diff))*100)
 
-exit()
-
 # Determine which features can be used to predict
-def calc_variance_categorial(df, cols, target, show=False):
+def calc_variance_categorial(df, cols, target, show=True):
     results = []
 
     for name, col in df[cols].iteritems():
         total_var = 0
+        total_size = 0
         groups = df.fillna(-1).groupby(name)  # replace nan and group
         keys = groups.groups.keys()
         # keys = keys - [-1]  # ignore nan
@@ -88,13 +88,15 @@ def calc_variance_categorial(df, cols, target, show=False):
                 var = group[target].var()  # calculate variance of the target column for the group
             weight = len(group) / nTarget  # calculate weight of variance
             total_var += var * weight  # sum variances
-        results.append([name, len(keys), total_var, total_var / varTarget])
+        missing_percentage = len(groups.get_group(-1))/len(col)
+        results.append([name, total_var, total_var / varTarget, missing_percentage*100,
+                        (total_var/varTarget)/(1-missing_percentage)])
 
-    results = sorted(results, key=lambda x: x[2]) # sort results based on fraction of variance
+    results = sorted(results, key=lambda x: x[4]) # sort results based on fraction of variance
 
-    if show: # print results
-        for feature, nkeys, var, frac in results:
-            print(feature, '& %.2f' % frac)
+    # if show: # print results
+    #     for feature, nkeys, var, frac in results:
+    #         print(feature, '& %.2f' % frac)
 
     return results
 
@@ -113,6 +115,8 @@ for col in column_names:
 target = 'Operatieduur'
 categorial_variance = calc_variance_categorial(data, categorical_cols, target, True)
 numerical_corr = data[numerical_cols].corr()
+print('Feature', 'Total'.rjust(29), 'Weighted'.rjust(11), 'NaN'.rjust(4), 'With NaN'.rjust(16))
+print(tabulate(categorial_variance))
 
 # plt.figure(figsize=(10,7))
 # sn.heatmap(numerical_corr, annot=True)
@@ -156,7 +160,7 @@ fig.legend(bbox_to_anchor=(0.7, 0.85), loc='upper left', ncol=1)
 ax2.set_xlim(right=310, left=-10)
 plt.savefig('figures/threshold_operations.png', dpi=300)
 
-noperations_goal = 2  # amount of operations to predict
+noperations_goal = 10  # amount of operations to predict
 threshold = [n for n,i in enumerate(ntypes_per_threshold) if i < noperations_goal][0]
 print('Threshold for', noperations_goal, 'is:', threshold)
 print('Percentage of data left:', foperations_per_threshold[threshold])

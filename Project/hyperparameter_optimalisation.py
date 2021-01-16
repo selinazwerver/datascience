@@ -8,7 +8,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
@@ -80,13 +80,12 @@ def calc_variance_categorial(df, cols, target, show=False):
 
 
 data = preprocess_data(data)
-data_for_initial_r2 = data[data['Operatieduur'].notna()]
-data_for_initial_r2 = data_for_initial_r2[data_for_initial_r2['Geplande operatieduur'].notna()]
-r2_original = r2_score(data_for_initial_r2['Geplande operatieduur'], data_for_initial_r2['Operatieduur'])
+# data_for_initial_r2 = data[data['Operatieduur'].notna()]
+# data_for_initial_r2 = data_for_initial_r2[data_for_initial_r2['Geplande operatieduur'].notna()]
+# r2_original = r2_score(data_for_initial_r2['Geplande operatieduur'], data_for_initial_r2['Operatieduur'])
 # print(r2_original)
 
 ## Check which columns are numerical/categorial
-data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
 column_names = list(data.columns.values)
 numerical_cols = []
 categorical_cols = []
@@ -111,17 +110,24 @@ removed_types.append(-1)  # also remove nan group
 for key in removed_types:
     data = data.drop(operation_groups.get_group(key).index)
 
+# Remove large over/underestimation
+data['Difference'] = abs(data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
+data['Percentual diff'] = (data['Difference']/data['Geplande operatieduur']) * 100
+data = data.drop(data[data['Percentual diff'] > 100].index)
+
 ## Transform categories to numbers to be used in models
-for name, nkeys, var, frac in categorial_variance:
+order = []  # to store which number corresponds to which operation type
+for name in categorical_cols:
     data[name] = data[name].astype('category').cat.codes
 
 data = data[data['Operatieduur'].notna()]  # remove nan surgery durations
+
 all_features = [l[0] for l in categorial_variance]  # list of all features
 result = []
 options = ['LR', 'MARS', 'DT', 'RT', 'MLP']
 
 # Make models + predictions
-nfeatures = 23  # best result : 1
+nfeatures = 4  # best result : 1
 seed = 41  # to make results reproducable
 features = all_features[0:nfeatures]  # select right features
 features.append('Operatieduur')
@@ -140,99 +146,78 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random
 
 ## Hyperparameter tuning
 ## RANDOM FOREST
-n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]  # ntrees
-max_features = ['auto', 'sqrt']  # number of features to consider at every split
-max_depth = [int(x) for x in np.linspace(start=10, stop=110, num=11)]  # maximum number of levels in tree
-max_depth.append(None)
-min_samples_split = [int(x) for x in np.linspace(start=2, stop=10)]  # minimum number of samples required to split a node
-min_samples_leaf = [int(x) for x in np.linspace(start=2, stop=10)]  # minimum number of samples required at each leaf node
-bootstrap = [True, False]  # method of selecting samples for training each tree
-
-# Create the random grid
-rf_parameters = {'n_estimators': n_estimators,
-                 'max_features': max_features,
-                 'max_depth': max_depth,
-                 'min_samples_split': min_samples_split,
-                 'min_samples_leaf': min_samples_leaf,
-                 'bootstrap': bootstrap}
-
-RF = RandomForestRegressor()
-# Random search of parameters, using 3 fold cross validation,
-# search across 100 different combinations, and use all available cores
-RF_random = RandomizedSearchCV(estimator=RF, param_distributions=rf_parameters, n_iter=200, cv=3, verbose=2,
-                               random_state=seed, n_jobs=-1)
-RF_random.fit(X_train, Y_train)  # fit the random search model
-print('Best parameters RF:')
-print(RF_random.best_params_)
-RF_predictions = RF_random.best_estimator_.predict(X_test)
-print('RF MSE:', mean_squared_error(Y_test, RF_predictions))
-
-# {'n_estimators': 1509,
-# 'min_samples_split': 9,
-# 'min_samples_leaf': 3,
-# 'max_features': 'sqrt',
-# 'max_depth': None,
-# 'bootstrap': True}
-
-# RF R2: 0.5060715564490351
-
-## MULTILAYER PERCEPTRON
-# hidden_layer_sizes = [(sp_randint.rvs(100,600,1), sp_randint.rvs(100,600,1),), (sp_randint.rvs(100,600,1),)]  # nlayers
-# activation = ['identity', 'logistic', 'tanh', 'relu']  # activation function
-# solver = ['lbfgs', 'sgd', 'adam']  # solver for weight optimization
-# learning_rate = ['constant', 'adaptive', 'invscaling']
-# # max_iter = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]
+# n_estimators = [int(x) for x in np.linspace(start=10, stop=200, num=10)]  # ntrees
+# criterion = ['mse', 'mae']
+# max_features = ['auto', 'sqrt', 'log2']  # number of features to consider at every split
+# max_depth = [int(x) for x in np.linspace(start=1, stop=100, num=1)]  # maximum number of levels in tree
+# max_depth.append(None)
+# min_samples_split = [int(x) for x in np.linspace(start=2, stop=10, num=1)]  # minimum number of samples required to split a node
+# min_samples_leaf = [int(x) for x in np.linspace(start=1, stop=10, num=10)]  # minimum number of samples required at each leaf node
+# bootstrap = [True, False]  # method of selecting samples for training each tree
 #
 # # Create the random grid
-# mlp_parameters = {'hidden_layer_sizes' : hidden_layer_sizes,
-#                   'activation' : activation,
-#                   'solver' : solver,
-#                   'learning_rate' : learning_rate,
-#                   }
-#                   # 'max_iter' : max_iter}
+# rf_parameters = {'n_estimators': n_estimators,
+#                  'criterion': criterion,
+#                  'max_features': max_features,
+#                  'max_depth': max_depth,
+#                  'min_samples_split': min_samples_split,
+#                  'min_samples_leaf': min_samples_leaf,
+#                  'bootstrap': bootstrap,
+#                  'random_state': [seed]}
 #
-# MLP = MLPRegressor()
-# MLP_grid = RandomizedSearchCV(estimator=MLP, param_distributions=mlp_parameters, n_iter=200, cv=3, verbose=2,
-#                               random_state=seed, n_jobs=-1)
-# MLP_grid.fit(X_train, Y_train)  # fit the random search model
-# print('Best parameters MLP:')
-# print(MLP_grid.best_params_)
-# MLP_predictions = MLP_grid.best_estimator_.predict(X_test)
-# print('MLP R2:', r2_score(Y_test, MLP_predictions))
+# RF = RandomForestRegressor()
+# # Random search of parameters, using 3 fold cross validation,
+# # search across 100 different combinations, and use all available cores
+# grid_search = GridSearchCV(estimator=RF, param_grid=rf_parameters, cv=3, verbose=2, n_jobs=-1)
+# grid_search.fit(X_train, Y_train)  # fit the random search model
+# print('Best parameters RF:')
+# print(grid_search.best_params_)
+# RF_predictions = grid_search.best_estimator_.predict(X_test)
+# print('MAE RF:', mean_absolute_error(Y_test, RF_predictions))
+
+# {'bootstrap': False,
+# 'criterion': 'mae',
+# 'max_depth': None,
+# 'max_features': 'sqrt',
+# 'min_samples_leaf': 2,
+# 'min_samples_split': 2,
+# 'n_estimators': 178,
+# 'random_state': 41}
+# MAE RF: 36.01340798491681
 
 ## GRADIENT BOOSTEING REGRESSION
-# loss = ['ls', 'lad' ,'huber', 'quantile']
-# n_estimators = [int(x) for x in np.linspace(start=200, stop=2000, num=100)]
-# criterion = ['friedman_mse', 'mse', 'mae']
-# min_samples_split = [int(x) for x in np.linspace(start=2, stop=10)]
-# min_samples_leaf = [int(x) for x in np.linspace(start=2, stop=10)]
-# max_depth = [int(x) for x in np.linspace(start=10, stop=110, num=11)]
-# max_features = ['auto', 'sqrt', 'log2']
-#
-# gbr_parameters = {'loss' : loss,
-#                   'n_estimators' : n_estimators,
-#                   'criterion' : criterion,
-#                   'min_samples_split' : min_samples_split,
-#                   'min_samples_leaf' : min_samples_leaf,
-#                   'max_depth' : max_depth,
-#                   'max_features' : max_features}
-#
-# GBR = GradientBoostingRegressor()
-# GBR_random = RandomizedSearchCV(estimator=GBR, param_distributions=gbr_parameters, n_iter=200, cv=3, verbose=2,
-#                                random_state=seed, n_jobs=-1)
-# GBR_random.fit(X_train, Y_train)  # fit the random search model
-# print('Best parameters GBR:')
-# print(GBR_random.best_params_)
-# GBR_predictions = GBR_random.best_estimator_.predict(X_test)
-# print('GBR R2:', r2_score(Y_test, GBR_predictions))
+loss = ['ls', 'lad' ,'huber', 'quantile']
+n_estimators = [int(x) for x in np.linspace(start=10, stop=200, num=10)]
+criterion = ['friedman_mse', 'mse', 'mae']
+min_samples_split = [int(x) for x in np.linspace(start=2, stop=10, num=1)]
+min_samples_leaf = [int(x) for x in np.linspace(start=1, stop=10)]
+max_depth = [int(x) for x in np.linspace(start=10, stop=100, num=1)]
+max_depth.append(None)
+max_features = ['auto', 'sqrt', 'log2']
 
-# {'n_estimators': 600,
-# 'min_samples_split': 4,
-# 'min_samples_leaf': 5,
-# 'max_features': 'log2',
-# 'max_depth': 10,
-# 'loss': 'ls',
-# 'criterion': 'mae'}
+gbr_parameters = {'loss' : loss,
+                  'n_estimators' : n_estimators,
+                  'criterion' : criterion,
+                  'min_samples_split' : min_samples_split,
+                  'min_samples_leaf' : min_samples_leaf,
+                  'max_depth' : max_depth,
+                  'max_features' : max_features,
+                  'random_state': [seed]}
 
+GBR = GradientBoostingRegressor()
+GBR_random = GridSearchCV(estimator=GBR, param_grid=gbr_parameters, cv=3, verbose=2, n_jobs=-1)
+GBR_random.fit(X_train, Y_train)  # fit the random search model
+print('Best parameters GBR:')
+print(GBR_random.best_params_)
+GBR_predictions = GBR_random.best_estimator_.predict(X_test)
+print('GBR MAE:', mean_absolute_error(Y_test, GBR_predictions))
 
-# RF R2: 0.58685816869416
+# {'criterion': 'mae',
+# 'loss': 'huber',
+# 'max_depth': None,
+# 'max_features': 'sqrt',
+# 'min_samples_leaf': 4,
+# 'min_samples_split': 2,
+# 'n_estimators': 52,
+# 'random_state': 41}
+# GBR MAE: 35.98213220081576
