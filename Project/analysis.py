@@ -100,7 +100,23 @@ def calc_variance_categorial(df, cols, target, show=True):
 
     return results
 
-# Check which columns are numerical or categorical
+## Percentage over/underestimating per surgery
+data['Difference'] = (data['Operatieduur'] - data['Geplande operatieduur'])  # generate difference column
+data['Percentual diff'] = (data['Difference']/data['Geplande operatieduur']) * 100
+
+groups = data.groupby('Operatietype')
+keys = ['AVR', 'AVR + MVP shaving', 'CABG', 'CABG + AVR', 'CABG + Pacemakerdraad tijdelijk',
+         'Lobectomie of segmentresectie', 'Mediastinoscopie', 'MVP', 'Rethoracotomie', 'Wondtoilet']
+average_percentage = []
+
+for key in keys:
+    group = groups.get_group(key)
+    average_percentage.append([key, np.mean(group['Percentual diff'])])
+
+print(tabulate(average_percentage))
+exit()
+
+# Check which columns are numerical/categorical
 data = data.drop(['Geplande operatieduur', 'Ziekenhuis ligduur', 'IC ligduur'], 1)
 column_names = list(data.columns.values)
 numerical_cols = []
@@ -192,4 +208,6 @@ plt.tight_layout()
 plt.savefig('figures/stdev_mean_operatietype.png', dpi=300)
 
 print('Correlation:', corr)
+
+
 

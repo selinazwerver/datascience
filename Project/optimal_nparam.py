@@ -12,8 +12,10 @@ from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 import pyearth
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
 
 data_file = 'surgical_case_durations.csv'
 data = pd.read_csv(data_file, sep=';', encoding='ISO-8859-1')
@@ -72,6 +74,11 @@ def calc_variance_categorial(df, cols, target, show=True):
     results = sorted(results, key=lambda x: x[4]) # sort results based on fraction of variance
 
     return results
+
+def onehotencode(data):
+    enc = OneHotEncoder()
+    enc.fit(data)
+    return enc.transform(data).toarray()
 
 data = preprocess_data(data)
 data_for_initial_mse = data[data['Operatieduur'].notna()]
@@ -144,23 +151,31 @@ for nfeatures in range(1, len(all_features)):
     data_clean['Percentual diff'] = (data_clean['Difference'] / data['Geplande operatieduur']) * 100
     data_clean = data_clean.drop(data_clean[data_clean['Percentual diff'] > 100].index)
 
-    Y = data_clean['Operatieduur']
-    X = data_clean[features[0:nfeatures]]
+    Y = data['Operatieduur']
+    X = data[features[0:nfeatures]]
+    X_mlp = onehotencode(data[features[0:nfeatures]])  # one hot encoding for mlp to use
+    X_train_mlp, X_test_mlp, Y_train_mlp, Y_test_mlp = train_test_split(X_mlp, Y, test_size=0.20, random_state=seed)
     X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
 
     remaining_data.append([nfeatures, len(data_clean.groupby('Operatietype').groups.keys()), len(Y_train), len(Y_test)])
 
     # Linear regression
     LR = LinearRegression()
-    LR.fit(X_train, Y_train)
-    LR_predictions = LR.predict(X_test)
-    result_LR.append(mean_absolute_error(Y_test, LR_predictions))
+    LR.fit(X_train_mlp, Y_train_mlp)
+    LR_predictions = LR.predict(X_test_mlp)
+    result_LR.append(mean_absolute_error(Y_test_mlp, LR_predictions))
 
     # Multivariate adaptive regression splines
     MARS = pyearth.Earth()
-    MARS.fit(X_train, Y_train)
-    MARS_predictions = MARS.predict(X_test)
-    result_MARS.append(mean_absolute_error(Y_test, MARS_predictions))
+    MARS.fit(X_train_mlp, Y_train_mlp)
+    MARS_predictions = MARS.predict(X_test_mlp)
+    result_MARS.append(mean_absolute_error(Y_test_mlp, MARS_predictions))
+
+    # print(nfeatures)
+    # print('LR:', mean_absolute_error(Y_test_mlp, LR_predictions))
+    # print('MARS:', mean_absolute_error(Y_test_mlp, MARS_predictions))
+    # print()
+    # if nfeatures == 4: exit()
 
     # Random forest
     RF = RandomForestRegressor(random_state=seed)
@@ -170,9 +185,9 @@ for nfeatures in range(1, len(all_features)):
 
     # Multilayer perceptron network
     MLP = MLPRegressor()
-    MLP.fit(X_train, Y_train)
-    MLP_predictions = MLP.predict(X_test)
-    result_MLP.append(mean_absolute_error(Y_test, MLP_predictions))
+    MLP.fit(X_train_mlp, Y_train_mlp)
+    MLP_predictions = MLP.predict(X_test_mlp)
+    result_MLP.append(mean_absolute_error(Y_test_mlp, MLP_predictions))
 
     # Gradient booster regression
     GBR = GradientBoostingRegressor(random_state=seed)
@@ -182,12 +197,13 @@ for nfeatures in range(1, len(all_features)):
 
 plt.figure()
 plt.plot(range(1, len(all_features)), result_LR, label='LR', color='orangered')
-plt.plot(range(1, len(all_features)), result_MARS, label='MARS', color='coral')
+plt.plot(range(1, len(all_features)), result_MARS, label='MARS', color='mediumvioletred')
 plt.plot(range(1, len(all_features)), result_RF, label='RF', color='indigo')
-plt.plot(range(1, len(all_features)), result_MLP, label='MLP', color='mediumvioletred')
+plt.plot(range(1, len(all_features)), result_MLP, label='MLP', color='coral')
 plt.plot(range(1, len(all_features)), result_GBR, label='GBR', color='plum')
+plt.ylim([33, 45])
 plt.legend()
-plt.xlabel('Amount of variables')
+plt.xlabel('Amount of features')
 plt.ylabel('MAE')
 plt.grid()
 plt.savefig('figures/mae_per_feature_amount.png', dpi=300)

@@ -13,9 +13,9 @@ from sklearn.metrics import r2_score
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.model_selection import RandomizedSearchCV
 from sklearn.model_selection import GridSearchCV
 from scipy.stats import randint as sp_randint
+from sklearn.preprocessing import OneHotEncoder
 import pyearth
 
 data_file = 'surgical_case_durations.csv'
@@ -78,6 +78,10 @@ def calc_variance_categorial(df, cols, target, show=False):
 
     return results
 
+def onehotencode(data):
+    enc = OneHotEncoder()
+    enc.fit(data)
+    return enc.transform(data).toarray()
 
 data = preprocess_data(data)
 # data_for_initial_r2 = data[data['Operatieduur'].notna()]
@@ -126,7 +130,7 @@ result = []
 options = ['LR', 'MARS', 'DT', 'RT', 'MLP']
 
 # Make models + predictions
-nfeatures = 4  # best result : 1
+nfeatures = 3  # best result : 1
 seed = 41  # to make results reproducable
 features = all_features[0:nfeatures]  # select right features
 features.append('Operatieduur')
@@ -141,7 +145,10 @@ for name, values in data[features].iteritems():
 
 Y = data['Operatieduur']
 X = data[features[0:nfeatures]]
+X_mlp = onehotencode(data[features[0:nfeatures]])  # one hot encoding for mlp to use
+X_train_mlp, X_test_mlp, Y_train_mlp, Y_test_mlp = train_test_split(X_mlp, Y, test_size=0.20, random_state=seed)
 X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random_state=seed)
+
 
 ## Hyperparameter tuning
 ## RANDOM FOREST
@@ -185,31 +192,31 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.20, random
 # MAE RF: 36.01340798491681
 
 ## GRADIENT BOOSTEING REGRESSION
-loss = ['ls', 'lad' ,'huber', 'quantile']
-n_estimators = [int(x) for x in np.linspace(start=10, stop=200, num=10)]
-criterion = ['friedman_mse', 'mse', 'mae']
-min_samples_split = [int(x) for x in np.linspace(start=2, stop=10, num=1)]
-min_samples_leaf = [int(x) for x in np.linspace(start=1, stop=10)]
-max_depth = [int(x) for x in np.linspace(start=10, stop=100, num=1)]
-max_depth.append(None)
-max_features = ['auto', 'sqrt', 'log2']
-
-gbr_parameters = {'loss' : loss,
-                  'n_estimators' : n_estimators,
-                  'criterion' : criterion,
-                  'min_samples_split' : min_samples_split,
-                  'min_samples_leaf' : min_samples_leaf,
-                  'max_depth' : max_depth,
-                  'max_features' : max_features,
-                  'random_state': [seed]}
-
-GBR = GradientBoostingRegressor()
-GBR_random = GridSearchCV(estimator=GBR, param_grid=gbr_parameters, cv=3, verbose=2, n_jobs=-1)
-GBR_random.fit(X_train, Y_train)  # fit the random search model
-print('Best parameters GBR:')
-print(GBR_random.best_params_)
-GBR_predictions = GBR_random.best_estimator_.predict(X_test)
-print('GBR MAE:', mean_absolute_error(Y_test, GBR_predictions))
+# loss = ['ls', 'lad' ,'huber', 'quantile']
+# n_estimators = [int(x) for x in np.linspace(start=10, stop=200, num=10)]
+# criterion = ['friedman_mse', 'mse', 'mae']
+# min_samples_split = [int(x) for x in np.linspace(start=2, stop=10, num=1)]
+# min_samples_leaf = [int(x) for x in np.linspace(start=1, stop=10)]
+# max_depth = [int(x) for x in np.linspace(start=10, stop=100, num=1)]
+# max_depth.append(None)
+# max_features = ['auto', 'sqrt', 'log2']
+#
+# gbr_parameters = {'loss' : loss,
+#                   'n_estimators' : n_estimators,
+#                   'criterion' : criterion,
+#                   'min_samples_split' : min_samples_split,
+#                   'min_samples_leaf' : min_samples_leaf,
+#                   'max_depth' : max_depth,
+#                   'max_features' : max_features,
+#                   'random_state': [seed]}
+#
+# GBR = GradientBoostingRegressor()
+# GBR_random = GridSearchCV(estimator=GBR, param_grid=gbr_parameters, cv=3, verbose=2, n_jobs=-1)
+# GBR_random.fit(X_train, Y_train)  # fit the random search model
+# print('Best parameters GBR:')
+# print(GBR_random.best_params_)
+# GBR_predictions = GBR_random.best_estimator_.predict(X_test)
+# print('GBR MAE:', mean_absolute_error(Y_test, GBR_predictions))
 
 # {'criterion': 'mae',
 # 'loss': 'huber',
@@ -220,3 +227,26 @@ print('GBR MAE:', mean_absolute_error(Y_test, GBR_predictions))
 # 'n_estimators': 52,
 # 'random_state': 41}
 # GBR MAE: 35.98213220081576
+
+## MULTILAYER PERCEPTRON
+hidden_layer_sizes = [(i,) for i in range(1, 200, 1)]
+activation = ['identity', 'logistic', 'tanh', 'relu']
+solver = ['lbfgs', 'sgd', 'adam']
+learning_rate = ['constant', 'invscaling', 'adaptive']
+
+mlp_parameters = {'hidden_layer_sizes': hidden_layer_sizes,
+                  'activation': activation,
+                  'solver': solver,
+                  'learning_rate': learning_rate,
+                  'random_state': [seed]}
+
+MLP = MLPRegressor()
+MLP_search = GridSearchCV(estimator=MLP, param_grid=mlp_parameters, cv=3, verbose=2, n_jobs=-1)
+MLP_search.fit(X_train_mlp, Y_train_mlp)
+print('Best parameters MLP:')
+print(MLP_search.best_params_)
+MLP_predictions = MLP_search.best_estimator_.predict(X_test_mlp)
+print('GBR MAE:', mean_absolute_error(Y_test_mlp, MLP_predictions))
+
+# {'activation': 'tanh', 'hidden_layer_sizes': (49,), 'learning_rate': 'constant', 'random_state': 41, 'solver': 'lbfgs'}
+# GBR MAE: 36.14649576034777
